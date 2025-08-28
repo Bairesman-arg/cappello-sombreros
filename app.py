@@ -22,6 +22,7 @@ from reportlab.graphics.barcode import code128
 # --- Variables de configuración ---
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), "DOCS", "ARTICULOS.xlsm")
 
+
 def load_codes_from_excel(excel_file_path):
     """
     Reads codes from columns A and B of the Excel spreadsheet.
@@ -55,6 +56,7 @@ def load_codes_from_excel(excel_file_path):
         st.error(f"Ocurrió un error al leer el archivo de Excel: {e}")
         return []
 
+
 def generate_barcode(code_to_generate: str):
     """
     Generates a barcode (Code128) from a text string
@@ -78,6 +80,7 @@ def generate_barcode(code_to_generate: str):
     except Exception as e:
         st.error(f"Error al generar el código de barras: {e}")
         return None
+
 
 def generate_pdf_labels(code: str, description: str, quantity: int):
     """
@@ -156,9 +159,10 @@ def generate_pdf_labels(code: str, description: str, quantity: int):
     buffer.seek(0)
     return buffer
 
+
 # --- Main Streamlit application logic ---
 def main():
-    st.title("🧢 Capello S")
+    st.title("🧢 CAPPELLO SOMBREROS")
     st.header("Generador de Códigos de Barras")
     st.write("Selecciona un código de la lista y se generará un código de barras.")
 
