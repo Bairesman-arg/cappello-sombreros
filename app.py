@@ -217,7 +217,7 @@ def main():
                 quantity = st.number_input(
                     "Cantidad de etiquetas ( 40 p/página ):",
                     min_value=1,
-                    max_value=40, # Maximum labels per page for H34140
+                    max_value=4000, # Maximum labels per page for H34140
                     value=1,
                     step=1
                 )
