@@ -6,6 +6,7 @@ estándar (Code128) del elemento seleccionado y crear un PDF de etiquetas,
 con una estructura de navegación en el sidebar.
 """
 import streamlit as st
+import pandas as pd
 import openpyxl
 import barcode
 from barcode.writer import ImageWriter
@@ -20,7 +21,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.graphics.barcode import code128
 
-VERSION = "1.0.5"
+VERSION = "1.0.7"
 
 # --- Variables de configuración ---
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), "DOCS", "ARTICULOS.xlsm")
@@ -181,7 +182,11 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
 # --- Lógica de las páginas de la aplicación ---
 
 def main_page():
-    """Lógica para la página principal: Generación de Códigos de Barras."""
+
+    # col1, col2 = st.columns([6, 1])
+    # with col2:
+    #    st.image("C:\WORKS\CAPELLO SOMBREROS\APPLICATION\IMAGES\Cappello_Logo.png",width=100, use_container_width=True)
+
     st.title("🧢 CAPPELLO SOMBREROS")
     st.header(f"Generador de Códigos de Barras vs {VERSION}")
 
@@ -208,7 +213,7 @@ def main_page():
             
             st.subheader("Opciones de Impresión")
             
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
 
             with col1:
                 price_input = st.text_input(
@@ -224,8 +229,8 @@ def main_page():
                     value=40,
                     step=1
                 )
-            
-            if st.button("Generar PDF para Imprimir"):
+
+            if st.button("Generar PDF para Imprimir",):
                 pdf_buffer = generate_pdf_labels(selected_code_only, price_input, quantity)
                 
                 if pdf_buffer:
@@ -240,9 +245,83 @@ def main_page():
         st.info("No se encontraron códigos o hubo un error al leer el archivo. Por favor, revisa la ruta y el contenido del archivo Excel.")
         
 # Puedes agregar más funciones para otras páginas aquí
-def another_page():
-    st.title("Otra Página")
-    st.write("Contenido de la otra página...")
+def update_art():
+
+    st.title("Subir archivo de artículos")
+    st.markdown("---")
+
+    # Muestra instrucciones al usuario
+    st.info("Por favor, suba el archivo de Excel (.xlsm) con el formato de artículos.")
+
+    # Widget para la carga de archivos
+    uploaded_file = st.file_uploader(
+        "Seleccione un archivo de Excel",
+        type=['xlsm'],
+        help="Solo se aceptan archivos con la extensión .xlsm"
+    )
+
+    # Verifica si se ha subido un archivo
+    if uploaded_file is not None:
+        try:
+            # Crea la ruta de la carpeta 'DOCS'
+            # os.getcwd() obtiene el directorio de trabajo actual (donde esta el script)
+            docs_folder = os.path.join(os.getcwd(), 'DOCS')
+
+            # Crea la carpeta 'DOCS' si no existe
+            os.makedirs(docs_folder, exist_ok=True)
+            
+            # Define el nombre del archivo de destino
+            file_path = os.path.join(docs_folder, 'ARTICULOS.xlsm')
+            
+            # Guarda el archivo en la carpeta 'DOCS'
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            st.success(f"¡Archivo '{uploaded_file.name}' guardado correctamente como 'ARTICULOS.xlsm'!")
+
+            # Opcional: Mostrar los primeros registros del Excel
+            # Esta parte solo es para verificar, puedes eliminarla si no la necesitas
+            # st.markdown("---")
+            st.subheader("Vista previa del archivo cargado")
+
+            # Lee el archivo guardado, indicando que los encabezados están en la segunda fila (índice 1)
+            df = pd.read_excel(file_path, header=1)
+
+            # Asegura que la tercera columna (índice 2) sea de tipo entero
+            # Primero convierte a numérico, maneja errores y luego rellena los nulos con 0 para poder convertirlos a enteros
+            df.iloc[:, 2] = pd.to_numeric(df.iloc[:, 2], errors='coerce').fillna(0).astype(int)
+
+            # Crea una copia del DataFrame para la visualización
+            df_display = df.head(10).copy()
+
+            # Aplica el formato de moneda a la tercera columna en el DataFrame de visualización
+            df_display.iloc[:, 2] = df_display.iloc[:, 2].apply(lambda x: f"${x:,.0f}")
+            
+            # Muestra las 10 primeras filas del DataFrame
+            st.dataframe(df_display, hide_index=True)
+            
+        except Exception as e:
+            st.error(f"Ocurrió un error al guardar el archivo: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # --- Main application logic with navigation ---
 
@@ -250,6 +329,7 @@ def app():
     # Definir las páginas disponibles
     PAGES = {
         "Generación de Códigos de Barra": main_page,
+        "Actualización de Artículos": update_art
         # Puedes agregar más páginas aquí:
         # "Otra Página": another_page,
     }
