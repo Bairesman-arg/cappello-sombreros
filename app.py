@@ -21,7 +21,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.graphics.barcode import code128
 
-VERSION = "1.0.9"
+VERSION = "1.0.10"
 
 # --- Variables de configuración ---
 EXCEL_PATH = os.path.join(os.path.dirname(__file__), "DOCS", "ARTICULOS.xlsm")
@@ -229,8 +229,8 @@ def main_page():
     # with col2:
     #    st.image("C:\WORKS\CAPELLO SOMBREROS\APPLICATION\IMAGES\Cappello_Logo.png",width=100, use_container_width=True)
 
-    st.title("🧢 CAPPELLO SOMBREROS")
-    st.header(f"Generador de Códigos de Barras vs {VERSION}")
+    st.title(f"🧢 CAPPELLO SOMBREROS  vs {VERSION}")
+    st.header(f"Generador de Códigos de Barras")
 
     codes_data = load_codes_from_excel(EXCEL_PATH)
     
@@ -290,8 +290,8 @@ def main_page():
 # Puedes agregar más funciones para otras páginas aquí
 def update_art():
 
-    st.title("Subir archivo de artículos")
-    st.markdown("---")
+    st.title(f"🧢 CAPPELLO SOMBREROS  vs {VERSION}")
+    st.header("Subir archivo de artículos")
 
     # Muestra instrucciones al usuario
     st.info("Por favor, suba el archivo de Excel (.xlsm) con el formato de artículos.")
@@ -371,7 +371,7 @@ def update_art():
 def app():
     # Definir las páginas disponibles
     PAGES = {
-        "Generación de Códigos de Barra": main_page,
+        "Generador de Códigos de Barra": main_page,
         "Actualización de Artículos": update_art
         # Puedes agregar más páginas aquí:
         # "Otra Página": another_page,
