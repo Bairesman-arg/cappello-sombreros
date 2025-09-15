@@ -24,7 +24,6 @@ import config
 import models
 
 st.set_page_config(
-    page_title="Generador de Etiquetas",
     layout="wide"
 )
 

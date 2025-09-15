@@ -9,6 +9,10 @@ from models import (
     save_remito
 )
 
+st.set_page_config(
+    layout="wide"
+)
+
 clientes_df, articulos_df = get_clients_and_articles()
 SENTINEL = "— Seleccione un artículo —"
 

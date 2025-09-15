@@ -8,6 +8,10 @@ import config
 # Import new functions from models.py
 from models import update_or_insert_articulos_from_excel
 
+st.set_page_config(
+    layout="wide"
+)
+
 def update_art():
     st.title(config.TITULO_APP)
     st.header("Actualización del Maestro de Artículos")

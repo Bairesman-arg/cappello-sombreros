@@ -14,6 +14,10 @@ from models import (
     get_all_rubros
 )
 
+st.set_page_config(
+    layout="wide"
+)
+
 def clear_inputs():
     """Reinicia los valores de los inputs del formulario."""
     try:
