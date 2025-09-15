@@ -129,7 +129,7 @@ def articulos_crud():
         st.session_state.show_delete_modal = False
     if not 'rubro_final' in st.session_state:
         st.session_state.rubro_final = config.RUBRO_DEFAULT
-
+    
     # Banderas para modificaciones y altas
     if not "was_modificated" in st.session_state: 
         st.session_state.was_modificated = False
@@ -184,45 +184,24 @@ def articulos_crud():
             st.session_state.precio_real_final = 0.0
             st.session_state.rubro_final = config.RUBRO_DEFAULT # rubro_options[0] if rubro_options else ""
 
-    def update_form_from_description():
-        """
-        Actualiza el formulario si el nro_articulo está vacío y la descripción
-        coincide con la de un artículo existente, permitiendo coincidencias parciales.
-        """
-        # 1. Capitaliza el texto de la descripción para el campo de entrada
-        user_input = st.session_state.descripcion_final.strip()
-        st.session_state.descripcion_final = user_input.capitalize()
-        
-        # 2. Verifica si el nro_articulo está vacío
-        if not st.session_state.nro_articulo_final:
-            # Prepara el texto de búsqueda en minúsculas para coincidencia parcial
-            search_term = user_input.lower()
-
-            # Itera sobre el diccionario de artículos para buscar la descripción
-            for nro_articulo, found_articulo in st.session_state.articulos_dict.items():
-                # 🚨 MODIFICACIÓN: La condición ahora busca si 'search_term' está en la descripción del artículo.
-                article_description_lower = found_articulo['descripcion'].strip().lower()
-
-                if search_term in article_description_lower:
-                    # Si encuentra una coincidencia, carga los datos en el estado de la sesión
-                    st.session_state.nro_articulo_exists = True
-                    st.session_state.selected_articulo_id = found_articulo['id']
-                    st.session_state.nro_articulo_final = found_articulo['nro_articulo']
-                    st.session_state.descripcion_final = found_articulo['descripcion']
-                    st.session_state.costo_final = float(found_articulo['costo']) if found_articulo['costo'] else None
-                    st.session_state.precio_publico_final = float(found_articulo['precio_publico']) if found_articulo['precio_publico'] else None
-                    st.session_state.precio_real_final = float(found_articulo['precio_real'])
-                    
-                    if found_articulo['nombre_rubro']:
-                        st.session_state.rubro_final = found_articulo['nombre_rubro']
-                    else:
-                        st.session_state.rubro_final = config.RUBRO_DEFAULT
-                    
-                    # Detiene la búsqueda una vez que encuentra la primera coincidencia
-                    break
-
     nro_articulo_col, desc_col = st.columns([1, 2],gap="small")
-    
+        
+    # Pop temporal para no repetir en el siguiente rerun
+    article_data = st.session_state.pop("selected_article_data", {})
+    if article_data:
+        if article_data.get("descripcion") != "":
+            st.session_state.descripcion_final = article_data.get("descripcion")
+        if not article_data.get("costo") == None:
+            st.session_state.costo_final = article_data.get("costo")
+        if not article_data.get("precio_real") == None:
+            st.session_state.precio_real_final = article_data.get("precio_real")
+        if not article_data.get("precio_publico") == None:
+            st.session_state.precio_publico_final = article_data.get("precio_publico")
+        if article_data.get("nombre_rubro") != "":
+            st.session_state.rubro_final = article_data.get("nombre_rubro")
+        if article_data.get("nro_articulo") != "":
+            st.session_state.nro_articulo_final = article_data.get("nro_articulo")
+
     with nro_articulo_col:
         st.text_input(
             "Número de Artículo",
@@ -239,8 +218,6 @@ def articulos_crud():
         st.text_input(
             "Descripción",
             key="descripcion_final",
-            # on_change=lambda: setattr(st.session_state, 'descripcion_final', st.session_state.descripcion_final.strip().capitalize())
-            on_change=update_form_from_description
         )
     
     col1, col2, col3, col4 = st.columns(4,gap="small")
@@ -248,21 +225,21 @@ def articulos_crud():
         st.number_input(
             "Costo",
             key="costo_final",
-            step=500,
+            step=500.00,
             on_change=update_precio_publico
         )
     with col2:
         st.number_input(
             "Precio Real",
             key="precio_real_final",
-            step=500
+            step=500.00
         )
 
     with col3:
         st.number_input(
             "Precio al Público",
             key="precio_publico_final",
-            step=500
+            step=500.00
         )
 
     with col4:
@@ -276,11 +253,12 @@ def articulos_crud():
             "Rubro",
             options=rubro_options,
             key="rubro_final",
-            # index=default_index,
             placeholder="Seleccione un rubro...",
             disabled=False
         )
 
+    article_data = None
+    
     with st.form("articulo_form", clear_on_submit=False, border=False):
         is_add_disabled = st.session_state.nro_articulo_exists or not st.session_state.nro_articulo_final
         is_mod_del_disabled = not st.session_state.nro_articulo_exists or not st.session_state.nro_articulo_final
@@ -367,31 +345,61 @@ def articulos_crud():
                 st.session_state.articulos_df['nro_articulo'].str.lower().str.contains(search_term_lower, na=False) | 
                 st.session_state.articulos_df['descripcion'].str.lower().str.contains(search_term_lower, na=False)
             ]
-            st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
             estado_grilla = "filtrados"
         else:
             # Si el usuario presiona el boton con el campo vacio, se muestra la grilla completa
             st.session_state.filtered_df = st.session_state.articulos_df.copy()
-            st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
 
     if "filtered_df" not in st.session_state:
         st.session_state.filtered_df = st.session_state.articulos_df.copy()
-        st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
 
     st.header(f"Maestro de Artículos ({len(st.session_state.filtered_df)} {estado_grilla})")
     if not st.session_state.filtered_df.empty:
+
+        # --- Parámetros de configuración ---
+        max_filas_a_mostrar = 20
+        alto_del_encabezado = 35
+        alto_de_la_fila = 35
+
+        # --- Lógica para ajustar la altura ---
+        # Calculamos el número de filas reales a mostrar
+        num_filas_a_mostrar = min(len(st.session_state.filtered_df), max_filas_a_mostrar)
+
+        # Calculamos la altura final
+        alto_df = alto_del_encabezado + alto_de_la_fila * num_filas_a_mostrar
+
+        # Eliminamos valores None en nombre_rubro
+        st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
+
+        # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
+        df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
+
+        # Insertamos la columna temporal "Seleccionado" solo si no existe
+        if "Seleccionado" not in df_to_show.columns:
+            df_to_show.insert(0, "Seleccionado", False)
+
+        # Columnas que dejaremos NO editables (todas salvo la columna Seleccionado)
+        disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
+
+        # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
+        editor_key = f"articulos_grid_{st.session_state.get('grid_version', 0)}"
+
         # Usar column_config para el formateo de la tabla
-        st.dataframe(
-            st.session_state.filtered_df, # <-- Usar el DataFrame filtrado aquí
+        edited_df = st.data_editor(
+            df_to_show, # <-- Filtrado o no
+            key=editor_key,
             width="stretch",
-            height=600,
+            height=alto_df,
             hide_index=True,
+            disabled=disabled_cols,
             column_order=[
-                'nro_articulo', 'descripcion', 'nombre_rubro', 'costo', 'precio_real', 'precio_publico', 'fecha_mod'
+                'Seleccionado', 'nro_articulo', 'descripcion', 'nombre_rubro', 'costo', 'precio_real', 'precio_publico', 'fecha_mod'
             ],
             column_config={
+                "Seleccionado": st.column_config.CheckboxColumn("✔", 
+                                help="Marque alguna de estas casillas de verificación para editar el artículo."),
                 "nro_articulo": st.column_config.TextColumn("Artículo"),
-                "descripcion": st.column_config.TextColumn("Descripción"),
+                "descripcion": st.column_config.TextColumn("Descripción", disabled=True),
                 "nombre_rubro": st.column_config.TextColumn("Rubro"),
                 "costo": st.column_config.NumberColumn(
                     "Costo",
@@ -411,6 +419,42 @@ def articulos_crud():
                 )
             }
         )
+
+        # --- Detectar selección(s) y cargar el artículo en el form ---
+        # edited_df es el DataFrame resultante con el checkbox actualizado
+        selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
+
+        if selected_idxs:
+            # Tomo la primera selección
+            idx = selected_idxs[0]
+            selected_row = edited_df.loc[idx]
+            
+            # Guardamos todos los datos de interés en un diccionario temporal
+            st.session_state.selected_article_data = {
+                "nro_articulo": selected_row["nro_articulo"],
+                "descripcion": selected_row["descripcion"],
+                "costo": float(selected_row["costo"]) if selected_row["costo"] > 0 else None,
+                "precio_real": float(selected_row["precio_real"]) if selected_row["precio_real"] > 0 else None,
+                "precio_publico": float(selected_row["precio_publico"]) if selected_row["precio_publico"] > 0 else None,
+                "nombre_rubro": selected_row["nombre_rubro"]
+            }
+
+            st.session_state.nro_articulo_exists = True
+            st.session_state.selected_articulo_id = int(selected_row["id"])
+            st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
+
+            st.rerun()
+
+        else:
+            st.session_state.selected_article_data = {
+                "nro_articulo": "",
+                "descripcion": "",
+                "costo": None,
+                "precio_real": None,
+                "precio_publico": None,
+                "nombre_rubro": ""
+            }
+
     else:
         st.info("No hay artículos registrados.")
 

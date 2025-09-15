@@ -17,7 +17,10 @@ def update_art():
     st.header("Actualización del Maestro de Artículos")
     st.subheader("Subir archivo de artículos")
 
-    st.info("Por favor, suba el archivo de Excel (.xlsm) con el formato de artículos. Los datos deben empezar en la fila 9.")
+    mensaje = "Por favor, suba el archivo Excel (.xlsm) con el formato de artículos. Los datos deben empezar en la fila 9.\n"
+    mensaje += "ATENCIÓN: Los datos previamente existentes serán reemplazados por la información de la planilla:\n"
+    mensaje += "basandose en el código de artículo, se afectarán las descripciones y precios."
+    st.info(mensaje)
 
     uploaded_file = st.file_uploader(
         "Seleccione un archivo de Excel",
