@@ -60,7 +60,7 @@ def update_art():
             )
 
             # Botón para confirmar la carga a la base de datos
-            if st.button("Cargar datos a la Base de Datos", type="primary"):
+            if st.button("Cargar datos al Maestro de Artículos", type="primary"):
                 with st.spinner('Cargando datos (puede demorar algún minuto)...'):
                     # Llama a la función que maneja la lógica de la base de datos
                     stats = update_or_insert_articulos_from_excel(df)

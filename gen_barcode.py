@@ -227,7 +227,7 @@ def gen_barcode():
         if selected_item:
             selected_code_only = selected_item['code']
             
-            col1, col2 = st.columns([2, 2])
+            col1, col2 = st.columns([2, 2],gap="small")
             with col1:
                 st.subheader("Código de barras:")
                 barcode_image = generate_barcode(selected_code_only)
@@ -236,7 +236,7 @@ def gen_barcode():
             
             st.subheader("Opciones de Impresión")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns(3,gap="small")
 
             with col1:
                 price_input = st.text_input(

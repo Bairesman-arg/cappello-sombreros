@@ -139,7 +139,7 @@ def remitos():
     else:
         st.session_state.cabecera_data['cliente_id'] = None
 
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2,gap="small")
     with col1:
         fecha_entrega = st.date_input("Fecha de Entrega", format="DD/MM/YYYY", key=f"fecha_entrega_{cabecera_key}", disabled=st.session_state.is_form_disabled)
         st.session_state.cabecera_data['fecha_entrega'] = fecha_entrega
@@ -183,7 +183,7 @@ def remitos():
     else:
         articulo_sel = SENTINEL
 
-    col_entregados, col_observ = st.columns([1,3])
+    col_entregados, col_observ = st.columns([1,3],gap="small")
     with col_entregados:
         st.number_input(
             "Entregados:",
@@ -202,7 +202,7 @@ def remitos():
 
     articulo_existe = (articulo_sel != SENTINEL) and (articulo_sel in st.session_state.items_data['Articulo'].values)
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3,gap="small")
     with c1:
         add_clicked = st.button("Agregar Item", width="stretch", disabled=(articulo_sel == SENTINEL) or articulo_existe or st.session_state.is_form_disabled)
     with c2:
@@ -270,13 +270,13 @@ def remitos():
     not_client_or_items = False
     remito_guardado = False
     
-    col_remito_buttons = st.columns(3)
+    col_remito_buttons = st.columns(3,gap="small")
 
     # Determine the disabled state for the 'Guardar Remito' button
     is_remito_saved = st.session_state.remito_id is not None
     is_guardar_disabled = st.session_state.is_form_disabled
 
-    col_remito_buttons = st.columns(3)
+    col_remito_buttons = st.columns(3,gap="small")
     with col_remito_buttons[0]:
         if st.button("Guardar Remito", type="primary", width="stretch", disabled=is_guardar_disabled):
             if is_remito_saved:
@@ -313,7 +313,7 @@ def remitos():
     # Modal de confirmación para "Nuevo Remito"
     if st.session_state.show_confirm_modal:
         st.warning("Hay artículos cargados en la grilla. ¿Desea continuar y borrar todos los datos del remito?")
-        col_confirm, col_cancel = st.columns([2, 4])
+        col_confirm, col_cancel = st.columns([2, 4],gap="small")
         with col_confirm:
             if st.button("Sí, continuar con un nuevo Remito"):
                 st.session_state.show_confirm_modal = False
