@@ -1,6 +1,12 @@
-/#CAPELLO_APP.bat
-/#CAPELLO_APP.vbs
+.vscode
+__pycache__
+compares
+DB
+IMAGES
+.gitignore
+/#CAPELLO_APP.*
+BAK
 etiquetas_*.*
-/BAK
-*.png
-Mis_Articulos.xlsm
+*.xlsm
+remitos.db
+secrets.toml
