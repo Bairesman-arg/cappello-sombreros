@@ -5,5 +5,5 @@ streamlit
 reportlab
 streamlit_option_menu
 sqlalchemy
-barcode
-Pillow
+python-barcode
+setuptools
