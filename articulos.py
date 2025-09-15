@@ -367,16 +367,16 @@ def articulos_crud():
                 st.session_state.articulos_df['nro_articulo'].str.lower().str.contains(search_term_lower, na=False) | 
                 st.session_state.articulos_df['descripcion'].str.lower().str.contains(search_term_lower, na=False)
             ]
-            st.session_state.filtered_df['nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
+            st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
             estado_grilla = "filtrados"
         else:
             # Si el usuario presiona el boton con el campo vacio, se muestra la grilla completa
             st.session_state.filtered_df = st.session_state.articulos_df.copy()
-            st.session_state.filtered_df['nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
-    
+            st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
 
     if "filtered_df" not in st.session_state:
         st.session_state.filtered_df = st.session_state.articulos_df.copy()
+        st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
 
     st.header(f"Maestro de Artículos ({len(st.session_state.filtered_df)} {estado_grilla})")
     if not st.session_state.filtered_df.empty:
