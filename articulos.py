@@ -5,8 +5,6 @@ from datetime import datetime
 from datetime import timedelta
 import config
 
-st.session_state.rubro_default = "GORRAS"
-
 from models import (
     get_all_articulos,
     save_new_articulo,
@@ -27,7 +25,7 @@ def clear_inputs():
         st.session_state.nro_articulo_exists = False
         st.session_state.nro_articulo_final = ""
         # Aseguramos que el rubro por defecto sea 'GORRAS'
-        st.session_state.rubro_final = st.session_state.rubro_default
+        st.session_state.rubro_final = config.RUBRO_DEFAULT
     except Exception as e:
         pass
 
@@ -126,7 +124,7 @@ def articulos_crud():
     if not 'show_delete_modal' in st.session_state:
         st.session_state.show_delete_modal = False
     if not 'rubro_final' in st.session_state:
-        st.session_state.rubro_final = st.session_state.rubro_default
+        st.session_state.rubro_final = config.RUBRO_DEFAULT
 
     # Banderas para modificaciones y altas
     if not "was_modificated" in st.session_state: 
@@ -148,7 +146,7 @@ def articulos_crud():
         st.session_state.was_modificated = False
         st.session_state.was_aggregated = False
         st.session_state.was_eliminated = False
-        st.session_state.rubro_final = st.session_state.rubro_default
+        st.session_state.rubro_final = config.RUBRO_DEFAULT
 
     else:
         pass
@@ -180,7 +178,7 @@ def articulos_crud():
             st.session_state.costo_final = 0.0
             st.session_state.precio_publico_final = 0.0
             st.session_state.precio_real_final = 0.0
-            st.session_state.rubro_final = st.session_state.rubro_default # rubro_options[0] if rubro_options else ""
+            st.session_state.rubro_final = config.RUBRO_DEFAULT # rubro_options[0] if rubro_options else ""
 
     def update_form_from_description():
         """
@@ -214,7 +212,7 @@ def articulos_crud():
                     if found_articulo['nombre_rubro']:
                         st.session_state.rubro_final = found_articulo['nombre_rubro']
                     else:
-                        st.session_state.rubro_final = st.session_state.rubro_default
+                        st.session_state.rubro_final = config.RUBRO_DEFAULT
                     
                     # Detiene la búsqueda una vez que encuentra la primera coincidencia
                     break
