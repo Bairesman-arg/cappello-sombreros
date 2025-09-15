@@ -221,7 +221,7 @@ def articulos_crud():
                     # Detiene la búsqueda una vez que encuentra la primera coincidencia
                     break
 
-    nro_articulo_col, desc_col = st.columns([1, 2])
+    nro_articulo_col, desc_col = st.columns([1, 2],gap="small")
     
     with nro_articulo_col:
         st.text_input(
@@ -243,7 +243,7 @@ def articulos_crud():
             on_change=update_form_from_description
         )
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns(4,gap="small")
     with col1:
         st.number_input(
             "Costo",
@@ -285,7 +285,7 @@ def articulos_crud():
         is_add_disabled = st.session_state.nro_articulo_exists or not st.session_state.nro_articulo_final
         is_mod_del_disabled = not st.session_state.nro_articulo_exists or not st.session_state.nro_articulo_final
 
-        col_add, col_mod, col_del, col_clear = st.columns(4)
+        col_add, col_mod, col_del, col_clear = st.columns(4,gap="small")
         with col_add:
             st.form_submit_button(
                 "Agregar Artículo ➕",
@@ -322,7 +322,7 @@ def articulos_crud():
 
     if 'show_delete_modal' in st.session_state and st.session_state.show_delete_modal:
         st.warning("⚠️ ¿Está seguro que desea eliminar este artículo? Esta acción no se puede deshacer.")
-        col_confirm_del, col_cancel_del = st.columns(2)
+        col_confirm_del, col_cancel_del = st.columns(2,gap="small")
         with col_confirm_del:
             if st.button("Confirmar Eliminación", type="primary"):
                 try:
@@ -343,7 +343,7 @@ def articulos_crud():
     
     # --- Seccion del filtro personalizado ---
     st.subheader("Filtrar Artículos")
-    col_input, col_btn = st.columns([3.5, 1])
+    col_input, col_btn = st.columns([3.5, 1],gap="small")
 
     with col_input:
         filter_term = st.text_input(
