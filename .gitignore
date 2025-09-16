@@ -1,3 +1,4 @@
+.gitignore
 .vscode
 __pycache__
 compares
@@ -11,3 +12,5 @@ etiquetas_*.*
 remitos.db
 secrets.toml
 ~$*
+.devcontainer
+GENERADOS
