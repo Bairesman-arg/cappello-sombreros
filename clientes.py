@@ -223,7 +223,7 @@ def clientes_crud():
             key="boca_final",
             min_value=0,
             step=1,
-            help="Ingrese un número de boca existente para editar o uno nuevo para agregar.\nEste valor es obligatorio",
+            help="Ingrese un número de boca existente para editar o uno nuevo para agregar.",
             on_change=update_form_with_client_data
         )
 
