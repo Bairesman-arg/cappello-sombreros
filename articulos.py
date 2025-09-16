@@ -92,6 +92,7 @@ def on_mod_click():
                 int(rubro_id) # <-- Pasar el ID del rubro
             )
             set_status_message(f"✍️ Artículo '{st.session_state.nro_articulo_final}' modificado con éxito.", "success")
+            st.session_state.do_filter = True # Obligo a refrescar la grilla
             clear_inputs()
         except Exception as e:
             set_status_message(f"❌ Error al modificar el artículo: {e}", "error")
@@ -150,7 +151,8 @@ def articulos_crud():
         st.session_state.was_modificated = False
         st.session_state.was_aggregated = False
         st.session_state.was_eliminated = False
-        st.session_state.rubro_final = config.RUBRO_DEFAULT
+        if st.session_state.rubro_final == "": 
+            st.session_state.rubro_final = config.RUBRO_DEFAULT
 
     else:
         pass
@@ -226,20 +228,23 @@ def articulos_crud():
             "Costo",
             key="costo_final",
             step=500.00,
+            min_value=0.00,
             on_change=update_precio_publico
         )
     with col2:
         st.number_input(
             "Precio Real",
             key="precio_real_final",
-            step=500.00
+            step=500.00,
+            min_value=0.00
         )
 
     with col3:
         st.number_input(
             "Precio al Público",
             key="precio_publico_final",
-            step=500.00
+            step=500.00,
+            min_value=0.00
         )
 
     with col4:
@@ -309,6 +314,7 @@ def articulos_crud():
                     del st.session_state.selected_articulo_id 
                     st.session_state.show_delete_modal = False
                     st.session_state.was_eliminated = True
+                    st.session_state.do_filter = True # Obligo a refrescar la grilla
                     st.rerun()
                 except Exception as e:
                     set_status_message(f"❌ Error al eliminar el artículo: {e}", "error")
