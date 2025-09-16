@@ -302,3 +302,32 @@ def update_or_insert_articulos_from_excel(df):
             inserted_count = len(articles_to_insert)
 
     return {"insertados": inserted_count, "actualizados": updated_count}
+
+def get_remito_completo(remito_id: int):
+    """Devuelve un diccionario con datos de cabecera e items de un remito dado."""
+    with engine.begin() as conn:
+        # --- Cabecera ---
+        cabecera = conn.execute(text("""
+            SELECT r.id AS remito_id, r.fecha_entrega, r.observaciones,
+                   c.razon_social, c.boca, c.direccion, c.localidad, c.telefono,
+                   COALESCE(c.porc_dto, 1) AS porc_dto
+            FROM remitos r
+            JOIN clientes c ON r.cliente_id = c.id
+            WHERE r.id = :rid
+        """), {"rid": remito_id}).mappings().first()
+
+        if not cabecera:
+            return None
+
+        # --- Items ---
+        items = pd.read_sql(text("""
+            SELECT a.nro_articulo, a.descripcion, a.precio_real, ri.entregados
+            FROM remito_items ri
+            JOIN articulos a ON ri.articulo_id = a.id
+            WHERE ri.remito_id = :rid
+        """), conn, params={"rid": remito_id})
+
+    return {
+        "cabecera": dict(cabecera),
+        "items": items
+    }

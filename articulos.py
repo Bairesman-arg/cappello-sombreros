@@ -41,14 +41,20 @@ def clear_status_message():
 
 # --- Callbacks de botones ---
 
-def on_add_click():
-    if st.session_state.precio_publico_final == 0:
-        set_status_message("❌ No se puede agregar un artículo dejando el 'Precio al Público' en cero.", "error")
+def valida_datos():
+    valida = False
+    if len(st.session_state.nro_articulo_final) > 11:
+        set_status_message("❌ Muchos caracteres para el 'Número de artículo'. El máximo es 11.", "error")
     elif st.session_state.precio_real_final == 0:
-        set_status_message("❌ No se puede agregar un artículo dejando el 'Precio Real' en cero.", "error")
-    elif not st.session_state.descripcion_final.strip():
-        set_status_message("❌ La descripción no puede estar en blanco.", "error")
+        set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio Real al Público' en cero.", "error")
+    # elif st.session_state.precio_publico_final == 0:
+    #     set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio al Público' en cero.", "error")
     else:
+        valida = True
+    return valida
+
+def on_add_click():
+    if valida_datos() and st.session_state.selected_articulo_id:
         try:
             nro_to_save = st.session_state.nro_articulo_final.upper()
             descripcion_to_save = st.session_state.descripcion_final.strip().capitalize()
@@ -70,11 +76,7 @@ def on_add_click():
     st.session_state.was_aggregated = True
 
 def on_mod_click():
-    if st.session_state.precio_publico_final == 0:
-        set_status_message("❌ No se puede modificar un artículo dejando el 'Precio al Público' en cero.", "error")
-    elif st.session_state.precio_real_final == 0:
-        set_status_message("❌ No se puede modificar un artículo dejando el 'Precio Real' en cero.", "error")
-    elif st.session_state.selected_articulo_id:
+    if valida_datos() and st.session_state.selected_articulo_id:
         try:
             rubro_id = st.session_state.rubros_df[st.session_state.rubros_df['nombre_rubro'] == st.session_state.rubro_final]['id'].iloc[0] # <-- Obtener el ID del rubro
 
@@ -233,7 +235,7 @@ def articulos_crud():
         )
     with col2:
         st.number_input(
-            "Precio Real",
+            "Real al Público",
             key="precio_real_final",
             step=500.00,
             min_value=0.00
@@ -390,6 +392,19 @@ def articulos_crud():
         # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
         editor_key = f"articulos_grid_{st.session_state.get('grid_version', 0)}"
 
+        def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
+            # Calcula un ancho aproximado en píxeles para una columna del DataFrame
+            # basado en la longitud del valor más largo.
+            if columna in df.columns:
+                # Convertimos todo a string para contar caracteres
+                max_chars = max(len(str(x)) for x in df[columna])
+                max_chars = max(max_chars,len(columna))
+                
+                # Estimación: ~8 px por carácter + padding extra
+                return max(min_width, max_chars * 8 + padding)
+            else:
+                return min_width
+
         # Usar column_config para el formateo de la tabla
         edited_df = st.data_editor(
             df_to_show, # <-- Filtrado o no
@@ -403,24 +418,33 @@ def articulos_crud():
             ],
             column_config={
                 "Seleccionado": st.column_config.CheckboxColumn("✔", 
-                                help="Marque alguna de estas casillas de verificación para editar el artículo."),
-                "nro_articulo": st.column_config.TextColumn("Artículo"),
-                "descripcion": st.column_config.TextColumn("Descripción", disabled=True),
-                "nombre_rubro": st.column_config.TextColumn("Rubro"),
+                                help="Marque alguna de estas casillas de verificación para editar el artículo.",
+                                width=calcular_ancho_columna(df_to_show,"Seleccionado")),
+                "nro_articulo": st.column_config.TextColumn("Artículo",
+                                width=calcular_ancho_columna(df_to_show,"nro_articulo")),
+                "descripcion": st.column_config.TextColumn("Descripción", 
+                                                           width=calcular_ancho_columna(df_to_show,"descripcion"),
+                                                           disabled=True),
+                "nombre_rubro": st.column_config.TextColumn("Rubro",
+                                                            width=calcular_ancho_columna(df_to_show,"nombre_rubro")),
                 "costo": st.column_config.NumberColumn(
                     "Costo",
+                    width=calcular_ancho_columna(df_to_show,"costo"),
                     format="$ %.2f"
                 ),
                 "precio_real": st.column_config.NumberColumn(
-                    "Precio Real",
+                    "Real al Público",
+                    width=calcular_ancho_columna(df_to_show,"precio_real"),
                     format="$ %.2f"
                 ),
                 "precio_publico": st.column_config.NumberColumn(
                     "Precio al Público",
+                    width=calcular_ancho_columna(df_to_show,"precio_publico"),
                     format="$ %.2f"
                 ),
                 "fecha_mod": st.column_config.DatetimeColumn(
-                    "Última Modificación" #,
+                    "Última Modificación",
+                     width=calcular_ancho_columna(df_to_show,"fecha_mod") #,
                     # format="DD/MM/YYYY HH:MM:SS"
                 )
             }

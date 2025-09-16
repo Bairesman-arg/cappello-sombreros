@@ -10,3 +10,4 @@ etiquetas_*.*
 *.xlsm
 remitos.db
 secrets.toml
+~$*

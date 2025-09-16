@@ -114,7 +114,7 @@ def clientes_crud():
     st.title(config.TITULO_APP)
     st.header("Gestión de Clientes")
 
-    st.info(f"La funcionalidad del ABM de Clientes está en desarrollo.")
+    st.info(f"La funcionalidad para la carga y modificacion de los Clientes está en desarrollo.")
     st.stop()
 
     if not "articulos_df" in st.session_state: 

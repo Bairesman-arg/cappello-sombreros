@@ -8,12 +8,15 @@ from models import (
     get_clients_and_articles, 
     save_remito
 )
+from gen_remito import gen_remito
 
 st.set_page_config(
     layout="wide"
 )
 
 clientes_df, articulos_df = get_clients_and_articles()
+# Paso la columna boca a integros
+clientes_df['boca'] = clientes_df['boca'].astype('Int64') 
 SENTINEL = "— Seleccione un artículo —"
 
 def clear_item_inputs():
@@ -251,6 +254,19 @@ def remitos():
         st.session_state.should_clear_items = True
         st.rerun()
 
+    #def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
+    #    # Calcula un ancho aproximado en píxeles para una columna del DataFrame
+    #    # basado en la longitud del valor más largo.
+    #    if columna in df.columns:
+    #        # Convertimos todo a string para contar caracteres
+    #        max_chars = max(len(str(x)) for x in df[columna])
+    #        max_chars = max(max_chars,len(columna))
+    #        
+    #        # Estimación: ~8 px por carácter + padding extra
+    #       return max(min_width, max_chars * 8 + padding)
+    #   else:
+    #        return min_width
+
     st.header("Items actuales del Remito")
     if not st.session_state.items_data.empty:
         st.dataframe(st.session_state.items_data[['Articulo', 'Descripción', 'Entregados', 'Observaciones']],
@@ -259,7 +275,7 @@ def remitos():
                         "Articulo": st.column_config.Column(width="medium"),
                         "Descripción": st.column_config.Column(width="large"),
                         "Entregados": st.column_config.Column(width="small"),
-                        "Observaciones": st.column_config.Column(width="large")
+                        "Observaciones": st.column_config.Column(width="small")
                         }
                     )
     else:
@@ -306,9 +322,20 @@ def remitos():
                 st.rerun()
 
     with col_remito_buttons[2]:
-        imprimir_text = f"Imprimir Remito #{st.session_state.remito_id}" if is_remito_saved else "Imprimir Remito"
-        if st.button(imprimir_text, width="stretch", disabled=not is_remito_saved or st.session_state.is_form_disabled):
-            st.info(f"Funcionalidad de impresión para el remito #{st.session_state.remito_id} en desarrollo.")
+        is_ready = "remito_id" in st.session_state and st.session_state.remito_id is not None
+        imprimir_text = f"Generar Remito #{st.session_state.remito_id}" if is_ready else "Generar Remito"
+        if is_ready:
+            excel_buffer = gen_remito(st.session_state.remito_id)
+            # st.success("Remito generado con éxito. Por favor, guarda el archivo en la carpeta 'Remitos' en tu Escritorio.")
+            st.download_button(
+                label=f"Descargar Remito #{st.session_state.remito_id}",
+                width="stretch",
+                data=excel_buffer,
+                file_name=f"Remito_{st.session_state.remito_id}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.button(imprimir_text, width="stretch", disabled=True)
 
     # Modal de confirmación para "Nuevo Remito"
     if st.session_state.show_confirm_modal:
