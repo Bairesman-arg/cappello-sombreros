@@ -28,7 +28,7 @@ def gen_remito(remito_id: int) -> io.BytesIO:
     ws["H5"] = cab["boca"] or ""
     ws["A6"] = f"{cab['direccion'] or ''} - {cab['localidad'] or ''}"
     ws["G6"] = cab["telefono"] or ""
-    ws["H2"] = cab["porc_dto"] if cab["porc_dto"] else 1
+    ws["H2"] = cab["porc_dto"] / 100 if cab["porc_dto"] else 1
 
     # --- Items ---
     base_row = 10

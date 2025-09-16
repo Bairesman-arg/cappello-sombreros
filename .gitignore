@@ -14,3 +14,4 @@ secrets.toml
 ~$*
 .devcontainer
 GENERADOS
+remito_*
