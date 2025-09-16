@@ -14,10 +14,6 @@ from models import (
     get_all_rubros
 )
 
-st.set_page_config(
-    layout="wide"
-)
-
 def clear_inputs():
     """Reinicia los valores de los inputs del formulario."""
     try:
@@ -109,6 +105,10 @@ def on_del_click():
 
 def articulos_crud():
     
+    st.set_page_config(
+        layout="wide"
+    )
+        
     st.title(config.TITULO_APP)
     st.header("Gestión de Artículos")
 
