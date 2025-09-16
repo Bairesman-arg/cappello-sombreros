@@ -159,6 +159,9 @@ def articulos_crud():
     else:
         pass
 
+    # if not "filtered_df" in st.session_state: 
+    #    st.session_state.filtered_df = pd.DataFrame()
+
     rubro_options = st.session_state.rubros_df['nombre_rubro'].tolist()
     
     if 'selected_articulo_id' not in st.session_state:
