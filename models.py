@@ -331,3 +331,76 @@ def get_remito_completo(remito_id: int):
         "cabecera": dict(cabecera),
         "items": items
     }
+
+def get_all_clientes():
+    """Devuelve un DataFrame de Pandas con todos los clientes, incluyendo el nombre del vendedor."""
+    query = text("""
+        SELECT c.*, v.nombre AS nombre_vendedor
+        FROM clientes c
+        LEFT JOIN vendedores v ON c.vendedor_id = v.id
+        ORDER BY c.boca ASC;
+    """)
+    df = pd.read_sql(query, engine)
+    return df
+
+def get_all_vendedores():
+    """Devuelve un DataFrame de Pandas con todos los vendedores."""
+    with engine.begin() as conn:
+        query = text("SELECT id, nombre FROM vendedores ORDER BY nombre ASC;")
+        df = pd.read_sql(query, conn)
+    return df
+
+def save_new_cliente(razon_social, boca, direccion, localidad, telefono, email, porc_dto, vendedor_id):
+    """Guarda un nuevo cliente en la base de datos."""
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO clientes (razon_social, boca, direccion, localidad, telefono, email, porc_dto, vendedor_id)
+            VALUES (:rs, :b, :d, :l, :t, :e, :pd, :vid);
+        """), {
+            "rs": razon_social,
+            "b": boca,
+            "d": direccion,
+            "l": localidad,
+            "t": telefono,
+            "e": email,
+            "pd": porc_dto,
+            "vid": vendedor_id
+        })
+
+def update_existing_cliente(cliente_id, razon_social, boca, direccion, localidad, telefono, email, porc_dto, vendedor_id):
+    """Actualiza un cliente existente en la base de datos."""
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE clientes
+            SET razon_social = :rs,
+                boca = :b,
+                direccion = :d,
+                localidad = :l,
+                telefono = :t,
+                email = :e,
+                porc_dto = :pd,
+                vendedor_id = :vid,
+                fecha_mod = CURRENT_TIMESTAMP
+            WHERE id = :id;
+        """), {
+            "id": cliente_id,
+            "rs": razon_social,
+            "b": boca,
+            "d": direccion,
+            "l": localidad,
+            "t": telefono,
+            "e": email,
+            "pd": porc_dto,
+            "vid": vendedor_id
+        })
+
+def delete_existing_cliente(cliente_id):
+    """Elimina un cliente existente de la base de datos."""
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM clientes WHERE id = :id;"), {"id": cliente_id})
+
+def check_client_in_remitos(cliente_id):
+    """Verifica si un cliente está asociado a algún remito."""
+    with engine.begin() as conn:
+        result = conn.execute(text("SELECT COUNT(*) FROM remitos WHERE cliente_id = :id;"), {"id": cliente_id}).scalar()
+        return result > 0

@@ -419,7 +419,7 @@ def articulos_crud():
             column_config={
                 "Seleccionado": st.column_config.CheckboxColumn("✔", 
                                 help="Marque alguna de estas casillas de verificación para editar el artículo.",
-                                width=calcular_ancho_columna(df_to_show,"Seleccionado")),
+                                width=50),
                 "nro_articulo": st.column_config.TextColumn("Artículo",
                                 width=calcular_ancho_columna(df_to_show,"nro_articulo")),
                 "descripcion": st.column_config.TextColumn("Descripción", 
