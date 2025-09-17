@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 from datetime import timedelta
 import config
+import time 
 
 from models import (
     get_all_articulos,
@@ -13,6 +14,33 @@ from models import (
     check_article_in_remitos,
     get_all_rubros
 )
+
+def scroll_to_top():
+    # Método más confiable para Streamlit
+    js_code = """
+    <script>
+        // Función para hacer scroll al top del contenedor de Streamlit
+        function scrollToTop() {
+            const container = window.parent.document.querySelector('.main');
+            if (container) {
+                container.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            } else {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+        }
+        
+        // Ejecutar después de un pequeño delay
+        setTimeout(scrollToTop, 150);
+    </script>
+    """
+    st.components.v1.html(js_code, height=0)
+
 
 def clear_inputs():
     """Reinicia los valores de los inputs del formulario."""
@@ -54,7 +82,7 @@ def valida_datos():
     return valida
 
 def on_add_click():
-    if valida_datos() and st.session_state.selected_articulo_id:
+    if valida_datos():
         try:
             nro_to_save = st.session_state.nro_articulo_final.upper()
             descripcion_to_save = st.session_state.descripcion_final.strip().capitalize()
@@ -110,7 +138,10 @@ def articulos_crud():
     st.set_page_config(
         layout="wide"
     )
-        
+
+    # Anchor para scroll
+    st.markdown('<div id="top"></div>', unsafe_allow_html=True)
+
     st.title(config.TITULO_APP)
     st.header("Gestión de Artículos")
 
@@ -208,6 +239,8 @@ def articulos_crud():
             st.session_state.rubro_final = article_data.get("nombre_rubro")
         if article_data.get("nro_articulo") != "":
             st.session_state.nro_articulo_final = article_data.get("nro_articulo")
+
+    st.markdown('<div id="go-to-here"></div>', unsafe_allow_html=True)
 
     with nro_articulo_col:
         st.text_input(
@@ -329,7 +362,7 @@ def articulos_crud():
             if st.button("Cancelar"):
                 st.session_state.show_delete_modal = False
                 st.rerun()
-    
+
     # --- Seccion del filtro personalizado ---
     st.subheader("Filtrar Artículos")
     col_input, col_btn = st.columns([3.5, 1],gap="small")
@@ -380,7 +413,10 @@ def articulos_crud():
         alto_df = alto_del_encabezado + alto_de_la_fila * num_filas_a_mostrar
 
         # Eliminamos valores None en nombre_rubro
-        st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
+        try:
+            st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
+        except:
+            pass
 
         # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
         df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
@@ -476,6 +512,8 @@ def articulos_crud():
             st.session_state.selected_articulo_id = int(selected_row["id"])
             st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
 
+            # Para forzar volver al inicio de la pagina
+            st.session_state.scroll_requested = True
             st.rerun()
 
         else:
@@ -490,6 +528,10 @@ def articulos_crud():
 
     else:
         st.info("No hay artículos registrados.")
+
+    if st.session_state.get('scroll_requested', False):
+        st.session_state.scroll_requested = False
+        scroll_to_top()
 
 if __name__ == "__main__":
     articulos_crud()

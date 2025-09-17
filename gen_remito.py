@@ -26,6 +26,7 @@ def gen_remito(remito_id: int) -> io.BytesIO:
     # --- Cabecera ---
     ws["A5"] = cab["razon_social"]
     ws["H5"] = cab["boca"] or ""
+    ws["H8"] = "Nro." + f'{remito_id:05d}'
     ws["A6"] = f"{cab['direccion'] or ''} - {cab['localidad'] or ''}"
     ws["G6"] = cab["telefono"] or ""
     ws["H2"] = cab["porc_dto"] / 100 if cab["porc_dto"] else 1
