@@ -16,30 +16,18 @@ from models import (
 )
 
 def scroll_to_top():
-    # Método más confiable para Streamlit
-    js_code = """
+    """
+    Inyecta código JavaScript con un pequeño retardo para asegurar que
+    el scroll se ejecute después del renderizado.
+    """
+    js_code = f"""
     <script>
-        // Función para hacer scroll al top del contenedor de Streamlit
-        function scrollToTop() {
-            const container = window.parent.document.querySelector('.main');
-            if (container) {
-                container.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });
-            } else {
-                window.scrollTo({
-                    top: 0,
-                    behavior: 'smooth'
-                });
-            }
-        }
-        
-        // Ejecutar después de un pequeño delay
-        setTimeout(scrollToTop, 150);
+        setTimeout(function() {{
+            window.parent.scrollTo(0, 0);
+        }}, 1000); // Retardo de 500 milisegundos
     </script>
     """
-    st.components.v1.html(js_code, height=0)
+    st.components.v1.html(js_code, height=0, width=0)
 
 
 def clear_inputs():
@@ -134,13 +122,18 @@ def on_del_click():
 
 
 def articulos_crud():
-    
+
+    # Esta sección se ejecuta después del rerun
+    if st.session_state.get('scroll_requested'):
+        # Yes. Three times! Sino no funciona bien (y ni así)
+        scroll_to_top()
+        scroll_to_top()
+        scroll_to_top()
+        del st.session_state.scroll_requested
+
     st.set_page_config(
         layout="wide"
     )
-
-    # Anchor para scroll
-    st.markdown('<div id="top"></div>', unsafe_allow_html=True)
 
     st.title(config.TITULO_APP)
     st.header("Gestión de Artículos")
@@ -514,6 +507,7 @@ def articulos_crud():
 
             # Para forzar volver al inicio de la pagina
             st.session_state.scroll_requested = True
+
             st.rerun()
 
         else:
@@ -528,10 +522,6 @@ def articulos_crud():
 
     else:
         st.info("No hay artículos registrados.")
-
-    if st.session_state.get('scroll_requested', False):
-        st.session_state.scroll_requested = False
-        scroll_to_top()
 
 if __name__ == "__main__":
     articulos_crud()

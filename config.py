@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-VERSION = "1.0.30"
+VERSION = "1.0.31"
 TITULO_APP = f"🧢 CAPPELLO SYSTEM vs {VERSION}"
 
 RUBRO_DEFAULT = "GORRAS"
