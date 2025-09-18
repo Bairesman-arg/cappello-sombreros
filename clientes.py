@@ -516,5 +516,7 @@ def clientes_crud():
     else:
         st.info("No hay clientes registrados.")
 
+    st.markdown(f"`{config.FOOTER_APP}`")
+
 if __name__ == "__main__":
     clientes_crud()

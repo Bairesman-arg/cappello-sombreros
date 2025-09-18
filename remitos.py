@@ -360,5 +360,7 @@ def remitos():
         # st.session_state.should_reset_all = True
         # st.rerun()
 
+    st.markdown(f"`{config.FOOTER_APP}`")
+
 if __name__ == "__main__":
     remitos()

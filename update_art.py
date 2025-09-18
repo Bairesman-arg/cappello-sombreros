@@ -72,3 +72,5 @@ def update_art():
 
         except Exception as e:
             st.error(f"Ocurrió un error al procesar el archivo o al actualizar la base de datos: {e}")
+
+    st.markdown(f"`{config.FOOTER_APP}`")

@@ -209,7 +209,7 @@ def gen_barcode():
     st.set_page_config(
         layout="wide"
     )
-    
+
     st.title(config.TITULO_APP)
     st.header(f"Generador de Códigos de Barras")
 
@@ -266,3 +266,5 @@ def gen_barcode():
                     )
     else:
         st.info("No se encontraron códigos o hubo un error al leer la base de datos.")
+
+    st.markdown(f"`{config.FOOTER_APP}`")

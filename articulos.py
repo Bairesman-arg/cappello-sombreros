@@ -15,21 +15,6 @@ from models import (
     get_all_rubros
 )
 
-def scroll_to_top():
-    """
-    Inyecta código JavaScript con un pequeño retardo para asegurar que
-    el scroll se ejecute después del renderizado.
-    """
-    js_code = f"""
-    <script>
-        setTimeout(function() {{
-            window.parent.scrollTo(0, 0);
-        }}, 1000); // Retardo de 500 milisegundos
-    </script>
-    """
-    st.components.v1.html(js_code, height=0, width=0)
-
-
 def clear_inputs():
     """Reinicia los valores de los inputs del formulario."""
     try:
@@ -61,6 +46,8 @@ def valida_datos():
     valida = False
     if len(st.session_state.nro_articulo_final) > 11:
         set_status_message("❌ Muchos caracteres para el 'Número de artículo'. El máximo es 11.", "error")
+    elif st.session_state.descripcion_final == "":
+        set_status_message("❌ Debe ingresar una descripción para el artículo.", "error")
     elif st.session_state.precio_real_final == 0:
         set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio Real al Público' en cero.", "error")
     # elif st.session_state.precio_publico_final == 0:
@@ -108,6 +95,7 @@ def on_mod_click():
             set_status_message(f"✍️ Artículo '{st.session_state.nro_articulo_final}' modificado con éxito.", "success")
             st.session_state.do_filter = True # Obligo a refrescar la grilla
             clear_inputs()
+            st.session_state.view_grilla = True
         except Exception as e:
             set_status_message(f"❌ Error al modificar el artículo: {e}", "error")
 
@@ -123,19 +111,16 @@ def on_del_click():
 
 def articulos_crud():
 
-    # Esta sección se ejecuta después del rerun
-    if st.session_state.get('scroll_requested'):
-        # Yes. Three times! Sino no funciona bien (y ni así)
-        scroll_to_top()
-        scroll_to_top()
-        scroll_to_top()
-        del st.session_state.scroll_requested
-
     st.set_page_config(
         layout="wide"
     )
 
     st.title(config.TITULO_APP)
+
+    if not "view_grilla" in st.session_state:
+        st.session_state.view_grilla = True
+
+    # the_header = "Gestión de Artículos" + " (modificando...)" if not st.session_state.view_grilla else "" 
     st.header("Gestión de Artículos")
 
     if not "articulos_df" in st.session_state: 
@@ -164,6 +149,8 @@ def articulos_crud():
         st.session_state.was_aggregated = False
     if not "was_eliminated" in st.session_state:
         st.session_state.was_eliminated = False
+    if not "frase_filtrada" in st.session_state:    
+        st.session_state.frase_filtrada =""
 
     if st.session_state.was_modificated or \
         st.session_state.was_aggregated or \
@@ -183,10 +170,8 @@ def articulos_crud():
     else:
         pass
 
-    # if not "filtered_df" in st.session_state: 
-    #    st.session_state.filtered_df = pd.DataFrame()
-
     rubro_options = st.session_state.rubros_df['nombre_rubro'].tolist()
+    filter_term = ""
     
     if 'selected_articulo_id' not in st.session_state:
         clear_inputs()
@@ -233,13 +218,11 @@ def articulos_crud():
         if article_data.get("nro_articulo") != "":
             st.session_state.nro_articulo_final = article_data.get("nro_articulo")
 
-    st.markdown('<div id="go-to-here"></div>', unsafe_allow_html=True)
-
     with nro_articulo_col:
         st.text_input(
             "Número de Artículo",
             key="nro_articulo_final",
-            help="Ingrese un código de artículo existente para editar o uno nuevo para agregar.",
+            help="Ingrese un código de artículo existente para editar\n\no uno nuevo para agregar.",
             on_change=update_form_with_article_data
         )
 
@@ -299,6 +282,18 @@ def articulos_crud():
         is_add_disabled = st.session_state.nro_articulo_exists or not st.session_state.nro_articulo_final
         is_mod_del_disabled = not st.session_state.nro_articulo_exists or not st.session_state.nro_articulo_final
 
+        is_add_disabled = (
+                st.session_state.nro_articulo_exists 
+                or not st.session_state.nro_articulo_final
+                or st.session_state.show_delete_modal
+            )
+        is_mod_del_disabled = (
+            not st.session_state.nro_articulo_exists 
+            or not st.session_state.nro_articulo_final
+            or st.session_state.show_delete_modal
+        )
+        is_clear_disabled = st.session_state.show_delete_modal
+
         col_add, col_mod, col_del, col_clear = st.columns(4,gap="small")
         with col_add:
             st.form_submit_button(
@@ -319,8 +314,11 @@ def articulos_crud():
                 on_click=on_del_click, width="stretch"
             )
         with col_clear:
-            if st.form_submit_button("Limpiar Formulario 🔄", width="stretch"):
+            if st.form_submit_button("Limpiar Formulario 🔄", 
+                                     width="stretch",
+                                     disabled=is_clear_disabled):
                 del st.session_state.selected_articulo_id
+                st.session_state.view_grilla = True
                 st.rerun()
 
     # --- Mostrar los mensajes de estado ---
@@ -336,7 +334,7 @@ def articulos_crud():
 
     if 'show_delete_modal' in st.session_state and st.session_state.show_delete_modal:
         st.warning("⚠️ ¿Está seguro que desea eliminar este artículo? Esta acción no se puede deshacer.")
-        col_confirm_del, col_cancel_del = st.columns(2,gap="small")
+        col_confirm_del, col_cancel_del, _, _ = st.columns(4, gap="small")
         with col_confirm_del:
             if st.button("Confirmar Eliminación", type="primary"):
                 try:
@@ -346,13 +344,14 @@ def articulos_crud():
                     st.session_state.show_delete_modal = False
                     st.session_state.was_eliminated = True
                     st.session_state.do_filter = True # Obligo a refrescar la grilla
+                    st.session_state.view_grilla = True
                     st.rerun()
                 except Exception as e:
                     set_status_message(f"❌ Error al eliminar el artículo: {e}", "error")
                     st.rerun()
 
         with col_cancel_del:
-            if st.button("Cancelar"):
+            if st.button("Cancelar Eliminación ❌"):
                 st.session_state.show_delete_modal = False
                 st.rerun()
 
@@ -366,162 +365,177 @@ def articulos_crud():
             key="filter_term",
             placeholder="Ingrese un código, una descripción o parte de ellas...",
             label_visibility="collapsed",
-            width="stretch"
+            width="stretch",
+            value=st.session_state.frase_filtrada,
+            disabled=not st.session_state.view_grilla
         )
+
     with col_btn:
-        if st.button("Filtrar", type="primary", width="stretch"):
+        if st.button("Filtrar", 
+                     type="primary", 
+                     width="stretch",
+                     disabled=not st.session_state.view_grilla):
+            # Guardar el texto actual como filtro activo
+            st.session_state.frase_filtrada = filter_term.strip()
             st.session_state.do_filter = True
             st.rerun()
     
     # Lógica de filtrado
     estado_grilla = "totales"
-    if "do_filter" in st.session_state and st.session_state.do_filter:
-        if filter_term.strip():
-            search_term_lower = filter_term.lower().strip()
-            st.session_state.filtered_df = st.session_state.articulos_df[
-                st.session_state.articulos_df['nro_articulo'].str.lower().str.contains(search_term_lower, na=False) | 
-                st.session_state.articulos_df['descripcion'].str.lower().str.contains(search_term_lower, na=False)
-            ]
-            estado_grilla = "filtrados"
-        else:
-            # Si el usuario presiona el boton con el campo vacio, se muestra la grilla completa
-            st.session_state.filtered_df = st.session_state.articulos_df.copy()
+    # Si hay una frase filtrada previa, usarla aunque no se haya presionado el botón
+    if st.session_state.frase_filtrada.strip():
+        active_filter = st.session_state.frase_filtrada.lower()
+        st.session_state.filtered_df = st.session_state.articulos_df[
+            st.session_state.articulos_df['nro_articulo'].str.lower().str.contains(active_filter, na=False) |
+            st.session_state.articulos_df['descripcion'].str.lower().str.contains(active_filter, na=False)
+        ]
+    else:
+        st.session_state.filtered_df = st.session_state.articulos_df.copy()
 
     if "filtered_df" not in st.session_state:
         st.session_state.filtered_df = st.session_state.articulos_df.copy()
 
-    st.header(f"Maestro de Artículos ({len(st.session_state.filtered_df)} {estado_grilla})")
-    if not st.session_state.filtered_df.empty:
+    if st.session_state.view_grilla:
 
-        # --- Parámetros de configuración ---
-        max_filas_a_mostrar = 20
-        alto_del_encabezado = 35
-        alto_de_la_fila = 35
+        st.header(f"Maestro de Artículos ({len(st.session_state.filtered_df)} {estado_grilla})")
+        if not st.session_state.filtered_df.empty:
 
-        # --- Lógica para ajustar la altura ---
-        # Calculamos el número de filas reales a mostrar
-        num_filas_a_mostrar = min(len(st.session_state.filtered_df), max_filas_a_mostrar)
+            # --- Parámetros de configuración ---
+            max_filas_a_mostrar = 20
+            alto_del_encabezado = 35
+            alto_de_la_fila = 35
 
-        # Calculamos la altura final
-        alto_df = alto_del_encabezado + alto_de_la_fila * num_filas_a_mostrar
+            # --- Lógica para ajustar la altura ---
+            # Calculamos el número de filas reales a mostrar
+            num_filas_a_mostrar = min(len(st.session_state.filtered_df), max_filas_a_mostrar)
 
-        # Eliminamos valores None en nombre_rubro
-        try:
-            st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
-        except:
-            pass
+            # Calculamos la altura final
+            alto_df = alto_del_encabezado + alto_de_la_fila * num_filas_a_mostrar
 
-        # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
-        df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
+            # Eliminamos valores None en nombre_rubro
+            try:
+                st.session_state.filtered_df.loc[:, 'nombre_rubro'] = st.session_state.filtered_df['nombre_rubro'].fillna('')
+            except:
+                pass
 
-        # Insertamos la columna temporal "Seleccionado" solo si no existe
-        if "Seleccionado" not in df_to_show.columns:
-            df_to_show.insert(0, "Seleccionado", False)
+            # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
+            df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
 
-        # Columnas que dejaremos NO editables (todas salvo la columna Seleccionado)
-        disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
+            # Insertamos la columna temporal "Seleccionado" solo si no existe
+            if "Seleccionado" not in df_to_show.columns:
+                df_to_show.insert(0, "Seleccionado", False)
 
-        # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
-        editor_key = f"articulos_grid_{st.session_state.get('grid_version', 0)}"
+            # Columnas que dejaremos NO editables (todas salvo la columna Seleccionado)
+            disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
 
-        def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
-            # Calcula un ancho aproximado en píxeles para una columna del DataFrame
-            # basado en la longitud del valor más largo.
-            if columna in df.columns:
-                # Convertimos todo a string para contar caracteres
-                max_chars = max(len(str(x)) for x in df[columna])
-                max_chars = max(max_chars,len(columna))
+            # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
+            editor_key = f"articulos_grid_{st.session_state.get('grid_version', 0)}"
+
+            def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
+                # Calcula un ancho aproximado en píxeles para una columna del DataFrame
+                # basado en la longitud del valor más largo.
+                if columna in df.columns:
+                    # Convertimos todo a string para contar caracteres
+                    max_chars = max(len(str(x)) for x in df[columna])
+                    max_chars = max(max_chars,len(columna))
+                    
+                    # Estimación: ~8 px por carácter + padding extra
+                    return max(min_width, max_chars * 8 + padding)
+                else:
+                    return min_width
+
+            # Usar column_config para el formateo de la tabla
+            edited_df = st.data_editor(
+                df_to_show, # <-- Filtrado o no
+                key=editor_key,
+                width="stretch",
+                height=alto_df,
+                hide_index=True,
+                disabled=disabled_cols,
+                column_order=[
+                    'Seleccionado', 'nro_articulo', 'descripcion', 'nombre_rubro', 'costo', 'precio_real', 'precio_publico', 'fecha_mod'
+                ],
+                column_config={
+                    "Seleccionado": st.column_config.CheckboxColumn("✔", 
+                                    help="Marque alguna de estas casillas de verificación\n\npara editar el artículo.",
+                                    width=50),
+                    "nro_articulo": st.column_config.TextColumn("Artículo",
+                                    width=calcular_ancho_columna(df_to_show,"nro_articulo")),
+                    "descripcion": st.column_config.TextColumn("Descripción", 
+                                                            width=calcular_ancho_columna(df_to_show,"descripcion"),
+                                                            disabled=True),
+                    "nombre_rubro": st.column_config.TextColumn("Rubro",
+                                                                width=calcular_ancho_columna(df_to_show,"nombre_rubro")),
+                    "costo": st.column_config.NumberColumn(
+                        "Costo",
+                        width=calcular_ancho_columna(df_to_show,"costo"),
+                        format="$ %.2f"
+                    ),
+                    "precio_real": st.column_config.NumberColumn(
+                        "Real al Público",
+                        width=calcular_ancho_columna(df_to_show,"precio_real"),
+                        format="$ %.2f"
+                    ),
+                    "precio_publico": st.column_config.NumberColumn(
+                        "Precio al Público",
+                        width=calcular_ancho_columna(df_to_show,"precio_publico"),
+                        format="$ %.2f"
+                    ),
+                    "fecha_mod": st.column_config.DatetimeColumn(
+                        "Última Modificación",
+                        width=calcular_ancho_columna(df_to_show,"fecha_mod") #,
+                        # format="DD/MM/YYYY HH:MM:SS"
+                    )
+                }
+            )
+
+            # --- Detectar selección(s) y cargar el artículo en el form ---
+            # edited_df es el DataFrame resultante con el checkbox actualizado
+            selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
+
+            if selected_idxs:
+                # Tomo la primera selección
+                idx = selected_idxs[0]
+                selected_row = edited_df.loc[idx]
                 
-                # Estimación: ~8 px por carácter + padding extra
-                return max(min_width, max_chars * 8 + padding)
+                # Guardamos todos los datos de interés en un diccionario temporal
+                st.session_state.selected_article_data = {
+                    "nro_articulo": selected_row["nro_articulo"],
+                    "descripcion": selected_row["descripcion"],
+                    "costo": float(selected_row["costo"]) if selected_row["costo"] > 0 else None,
+                    "precio_real": float(selected_row["precio_real"]) if selected_row["precio_real"] > 0 else None,
+                    "precio_publico": float(selected_row["precio_publico"]) if selected_row["precio_publico"] > 0 else None,
+                    "nombre_rubro": selected_row["nombre_rubro"]
+                }
+
+                st.session_state.nro_articulo_exists = True
+                st.session_state.selected_articulo_id = int(selected_row["id"])
+                st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
+
+                # Para forzar volver al inicio de la pagina
+                # st.session_state.scroll_requested = True
+
+                st.session_state.view_grilla = False
+                st.rerun()
+
             else:
-                return min_width
-
-        # Usar column_config para el formateo de la tabla
-        edited_df = st.data_editor(
-            df_to_show, # <-- Filtrado o no
-            key=editor_key,
-            width="stretch",
-            height=alto_df,
-            hide_index=True,
-            disabled=disabled_cols,
-            column_order=[
-                'Seleccionado', 'nro_articulo', 'descripcion', 'nombre_rubro', 'costo', 'precio_real', 'precio_publico', 'fecha_mod'
-            ],
-            column_config={
-                "Seleccionado": st.column_config.CheckboxColumn("✔", 
-                                help="Marque alguna de estas casillas de verificación para editar el artículo.",
-                                width=50),
-                "nro_articulo": st.column_config.TextColumn("Artículo",
-                                width=calcular_ancho_columna(df_to_show,"nro_articulo")),
-                "descripcion": st.column_config.TextColumn("Descripción", 
-                                                           width=calcular_ancho_columna(df_to_show,"descripcion"),
-                                                           disabled=True),
-                "nombre_rubro": st.column_config.TextColumn("Rubro",
-                                                            width=calcular_ancho_columna(df_to_show,"nombre_rubro")),
-                "costo": st.column_config.NumberColumn(
-                    "Costo",
-                    width=calcular_ancho_columna(df_to_show,"costo"),
-                    format="$ %.2f"
-                ),
-                "precio_real": st.column_config.NumberColumn(
-                    "Real al Público",
-                    width=calcular_ancho_columna(df_to_show,"precio_real"),
-                    format="$ %.2f"
-                ),
-                "precio_publico": st.column_config.NumberColumn(
-                    "Precio al Público",
-                    width=calcular_ancho_columna(df_to_show,"precio_publico"),
-                    format="$ %.2f"
-                ),
-                "fecha_mod": st.column_config.DatetimeColumn(
-                    "Última Modificación",
-                     width=calcular_ancho_columna(df_to_show,"fecha_mod") #,
-                    # format="DD/MM/YYYY HH:MM:SS"
-                )
-            }
-        )
-
-        # --- Detectar selección(s) y cargar el artículo en el form ---
-        # edited_df es el DataFrame resultante con el checkbox actualizado
-        selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
-
-        if selected_idxs:
-            # Tomo la primera selección
-            idx = selected_idxs[0]
-            selected_row = edited_df.loc[idx]
-            
-            # Guardamos todos los datos de interés en un diccionario temporal
-            st.session_state.selected_article_data = {
-                "nro_articulo": selected_row["nro_articulo"],
-                "descripcion": selected_row["descripcion"],
-                "costo": float(selected_row["costo"]) if selected_row["costo"] > 0 else None,
-                "precio_real": float(selected_row["precio_real"]) if selected_row["precio_real"] > 0 else None,
-                "precio_publico": float(selected_row["precio_publico"]) if selected_row["precio_publico"] > 0 else None,
-                "nombre_rubro": selected_row["nombre_rubro"]
-            }
-
-            st.session_state.nro_articulo_exists = True
-            st.session_state.selected_articulo_id = int(selected_row["id"])
-            st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
-
-            # Para forzar volver al inicio de la pagina
-            st.session_state.scroll_requested = True
-
-            st.rerun()
+                st.session_state.selected_article_data = {
+                    "nro_articulo": "",
+                    "descripcion": "",
+                    "costo": None,
+                    "precio_real": None,
+                    "precio_publico": None,
+                    "nombre_rubro": ""
+                }
 
         else:
-            st.session_state.selected_article_data = {
-                "nro_articulo": "",
-                "descripcion": "",
-                "costo": None,
-                "precio_real": None,
-                "precio_publico": None,
-                "nombre_rubro": ""
-            }
-
+            st.info("No hay artículos registrados.")
     else:
-        st.info("No hay artículos registrados.")
+        message_caption = "ATENCIÓN: La Grilla de Datos para visualización y búsquedas se habilitará "
+        message_caption += "cuando Modifique, Elimine o Limpie el formulario."
+        st.write( "✋ " + message_caption)
+
+    st.markdown(f"`{config.FOOTER_APP}`")
 
 if __name__ == "__main__":
     articulos_crud()
