@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime
 from datetime import timedelta
 import config
-import time 
 
 from models import (
     get_all_articulos,
@@ -50,8 +49,6 @@ def valida_datos():
         set_status_message("❌ Debe ingresar una descripción para el artículo.", "error")
     elif st.session_state.precio_real_final == 0:
         set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio Real al Público' en cero.", "error")
-    # elif st.session_state.precio_publico_final == 0:
-    #     set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio al Público' en cero.", "error")
     else:
         valida = True
     return valida
@@ -120,7 +117,6 @@ def articulos_crud():
     if not "view_grilla" in st.session_state:
         st.session_state.view_grilla = True
 
-    # the_header = "Gestión de Artículos" + " (modificando...)" if not st.session_state.view_grilla else "" 
     st.header("Gestión de Artículos")
 
     if not "articulos_df" in st.session_state: 
@@ -167,9 +163,6 @@ def articulos_crud():
         if st.session_state.rubro_final == "": 
             st.session_state.rubro_final = config.RUBRO_DEFAULT
 
-    else:
-        pass
-
     rubro_options = st.session_state.rubros_df['nombre_rubro'].tolist()
     filter_term = ""
     
@@ -189,8 +182,6 @@ def articulos_crud():
             
             if found_articulo['nombre_rubro']:
                 st.session_state.rubro_final = found_articulo['nombre_rubro']
-            else:
-                pass
         else:
             st.session_state.nro_articulo_exists = False
             st.session_state.selected_articulo_id = None
@@ -266,7 +257,7 @@ def articulos_crud():
         try:
             default_index = rubro_options.index(st.session_state.rubro_final)
         except ValueError:
-            default_index = 0 # O un valor por defecto seguro si "GORRAS" no se encuentra.
+            default_index = 0 # O un valor por defecto seguro.
 
         st.selectbox(
             "Rubro",
@@ -389,6 +380,7 @@ def articulos_crud():
             st.session_state.articulos_df['nro_articulo'].str.lower().str.contains(active_filter, na=False) |
             st.session_state.articulos_df['descripcion'].str.lower().str.contains(active_filter, na=False)
         ]
+        estado_grilla = "filtrados"
     else:
         st.session_state.filtered_df = st.session_state.articulos_df.copy()
 
@@ -484,7 +476,6 @@ def articulos_crud():
                     "fecha_mod": st.column_config.DatetimeColumn(
                         "Última Modificación",
                         width=calcular_ancho_columna(df_to_show,"fecha_mod") #,
-                        # format="DD/MM/YYYY HH:MM:SS"
                     )
                 }
             )
@@ -512,9 +503,6 @@ def articulos_crud():
                 st.session_state.selected_articulo_id = int(selected_row["id"])
                 st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
 
-                # Para forzar volver al inicio de la pagina
-                # st.session_state.scroll_requested = True
-
                 st.session_state.view_grilla = False
                 st.rerun()
 
@@ -535,6 +523,7 @@ def articulos_crud():
         message_caption += "cuando Modifique, Elimine o Limpie el formulario."
         st.write( "✋ " + message_caption)
 
+    # st.code(f"`{config.FOOTER_APP}`")
     st.markdown(f"`{config.FOOTER_APP}`")
 
 if __name__ == "__main__":

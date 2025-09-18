@@ -16,3 +16,4 @@ secrets.toml
 GENERADOS
 remito_*
 *.old
+*.new

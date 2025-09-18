@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-VERSION = "1.0.32"
+VERSION = "1.0.33"
 TITULO_APP = f"🧢 SISTEMA CAPPELLO vs {VERSION}"
 FOOTER_APP = "Sistema Capello® - Powered by Python - Brought to you by Bairesman® - 2025"
 

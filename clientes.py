@@ -57,7 +57,7 @@ def valida_datos():
     return valida
 
 def on_add_click():
-    if valida_datos() and not st.session_state.selected_cliente_id:
+    if valida_datos():
         try:
             vendedor_id = st.session_state.vendedores_df[st.session_state.vendedores_df['nombre'] == st.session_state.selected_vendedor]['id'].iloc[0] if st.session_state.selected_vendedor else None
 
@@ -75,10 +75,10 @@ def on_add_click():
             clear_inputs()
         except Exception as e:
             set_status_message(f"❌ Error al agregar el cliente: {e}", "error")
-    elif not st.session_state.selected_cliente_id:
-        set_status_message("❌ No se puede agregar un cliente si ya existe uno con el mismo Número de Boca.", "error")
-    else:
-        pass
+    # elif not st.session_state.selected_cliente_id:
+    #     set_status_message("❌ No se puede agregar un cliente si ya existe uno con el mismo Número de Boca.", "error")
+    # else:
+    #    pass
 
     st.session_state.was_aggregated = True
 
@@ -101,6 +101,7 @@ def on_mod_click():
             set_status_message(f"✍️ Cliente '{st.session_state.razon_social_final}' modificado con éxito.", "success")
             st.session_state.do_filter = True # Obligo a refrescar la grilla
             clear_inputs()
+            st.session_state.view_grilla = True
         except Exception as e:
             set_status_message(f"❌ Error al modificar el cliente: {e}", "error")
 
@@ -121,6 +122,10 @@ def clientes_crud():
     )
 
     st.title(config.TITULO_APP)
+
+    if not "view_grilla" in st.session_state:
+        st.session_state.view_grilla = True
+    
     st.header("Gestión de Clientes")
 
     if not "clientes_df" in st.session_state:
@@ -149,6 +154,9 @@ def clientes_crud():
         st.session_state.was_aggregated = False
     if not "was_eliminated" in st.session_state:
         st.session_state.was_eliminated = False
+    if not "frase_filtrada" in st.session_state:    
+        st.session_state.frase_filtrada =""
+
 
     if st.session_state.was_modificated or \
         st.session_state.was_aggregated or \
@@ -166,7 +174,7 @@ def clientes_crud():
             st.session_state.selected_vendedor = config.VENDEDOR_DEFAULT
 
     vendedor_options = st.session_state.vendedores_df['nombre'].tolist()
-    # vendedor_options.insert(0, "") # Agregamos una opción vacía
+    filter_term = ""
 
     if 'selected_cliente_id' not in st.session_state:
         clear_inputs()
@@ -183,7 +191,9 @@ def clientes_crud():
             st.session_state.telefono_final = found_cliente['telefono']
             st.session_state.email_final = found_cliente['email']
             st.session_state.porc_dto_final = float(found_cliente['porc_dto']) if found_cliente['porc_dto'] else 0.0
-            st.session_state.selected_vendedor = found_cliente['nombre_vendedor']
+
+            if found_cliente['nombre_vendedor']:
+                st.session_state.selected_vendedor = found_cliente['nombre_vendedor']
         else:
             st.session_state.boca_exists = False
             st.session_state.selected_cliente_id = None
@@ -286,6 +296,18 @@ def clientes_crud():
         is_add_disabled = st.session_state.boca_exists or st.session_state.boca_final == 0
         is_mod_del_disabled = not st.session_state.boca_exists or st.session_state.boca_final == 0
 
+        is_add_disabled = (
+                st.session_state.boca_exists 
+                or not st.session_state.boca_final
+                or st.session_state.show_delete_modal
+            )
+        is_mod_del_disabled = (
+            not st.session_state.boca_exists 
+            or not st.session_state.boca_final
+            or st.session_state.show_delete_modal
+        )
+        is_clear_disabled = st.session_state.show_delete_modal
+
         col_add, col_mod, col_del, col_clear = st.columns(4,gap="small")
         with col_add:
             st.form_submit_button(
@@ -308,6 +330,7 @@ def clientes_crud():
         with col_clear:
             if st.form_submit_button("Limpiar Formulario 🔄", width="stretch"):
                 del st.session_state.selected_cliente_id
+                st.session_state.view_grilla = True
                 st.rerun()
 
     # --- Mostrar los mensajes de estado ---
@@ -323,7 +346,7 @@ def clientes_crud():
 
     if 'show_delete_modal' in st.session_state and st.session_state.show_delete_modal:
         st.warning("⚠️ ¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer.")
-        col_confirm_del, col_cancel_del = st.columns(2,gap="small")
+        col_confirm_del, col_cancel_del, _, _ = st.columns(4,gap="small")
         with col_confirm_del:
             if st.button("Confirmar Eliminación", type="primary"):
                 try:
@@ -333,13 +356,14 @@ def clientes_crud():
                     st.session_state.show_delete_modal = False
                     st.session_state.was_eliminated = True
                     st.session_state.do_filter = True # Obligo a refrescar la grilla
+                    st.session_state.view_grilla = True
                     st.rerun()
                 except Exception as e:
                     set_status_message(f"❌ Error al eliminar el cliente: {e}", "error")
                     st.rerun()
 
         with col_cancel_del:
-            if st.button("Cancelar"):
+            if st.button("Cancelar Eliminación ❌"):
                 st.session_state.show_delete_modal = False
                 st.rerun()
 
@@ -353,171 +377,185 @@ def clientes_crud():
             key="filter_term",
             placeholder="Ingrese un número de boca, una razón social o parte de ellas...",
             label_visibility="collapsed",
-            width="stretch"
+            width="stretch",
+            value=st.session_state.frase_filtrada,
+            disabled=not st.session_state.view_grilla
         )
+
     with col_btn:
-        if st.button("Filtrar", type="primary", width="stretch"):
+        if st.button("Filtrar", 
+                     type="primary", 
+                     width="stretch",
+                     disabled=not st.session_state.view_grilla):
+            # Guardar el texto actual como filtro activo
+            st.session_state.frase_filtrada = filter_term.strip()
             st.session_state.do_filter = True
             st.rerun()
 
     # Lógica de filtrado
     estado_grilla = "totales"
-    if "do_filter" in st.session_state and st.session_state.do_filter:
-        if filter_term.strip():
-            search_term_lower = filter_term.lower().strip()
-            st.session_state.filtered_df = st.session_state.clientes_df[
-                st.session_state.clientes_df['boca'].astype(str).str.contains(search_term_lower, na=False) |
-                st.session_state.clientes_df['razon_social'].str.lower().str.contains(search_term_lower, na=False)
-            ]
-            estado_grilla = "filtrados"
-        else:
-            # Si el usuario presiona el boton con el campo vacio, se muestra la grilla completa
-            st.session_state.filtered_df = st.session_state.clientes_df.copy()
+    # Si hay una frase filtrada previa, usarla aunque no se haya presionado el botón
+    if st.session_state.frase_filtrada.strip():
+        active_filter = st.session_state.frase_filtrada.lower()
+        st.session_state.filtered_df = st.session_state.clientes_df[
+            st.session_state.clientes_df['boca'].astype(str).str.contains(active_filter, na=False) |
+            st.session_state.clientes_df['razon_social'].str.lower().str.contains(active_filter, na=False)
+        ]
+        estado_grilla = "filtrados"
+    else:
+        st.session_state.filtered_df = st.session_state.clientes_df.copy()
 
     if "filtered_df" not in st.session_state:
         st.session_state.filtered_df = st.session_state.clientes_df.copy()
 
-    st.header(f"Maestro de Clientes ({len(st.session_state.filtered_df)} {estado_grilla})")
-    if not st.session_state.filtered_df.empty:
+    if st.session_state.view_grilla:
 
-        # --- Parámetros de configuración ---
-        max_filas_a_mostrar = 20
-        alto_del_encabezado = 35
-        alto_de_la_fila = 36
+        st.header(f"Maestro de Clientes ({len(st.session_state.filtered_df)} {estado_grilla})")
+        if not st.session_state.filtered_df.empty:
 
-        # --- Lógica para ajustar la altura ---
-        # Calculamos el número de filas reales a mostrar
-        num_filas_a_mostrar = min(len(st.session_state.filtered_df), max_filas_a_mostrar)
+            # --- Parámetros de configuración ---
+            max_filas_a_mostrar = 20
+            alto_del_encabezado = 35
+            alto_de_la_fila = 35
 
-        # Calculamos la altura final
-        alto_df = alto_del_encabezado + alto_de_la_fila * num_filas_a_mostrar
+            # --- Lógica para ajustar la altura ---
+            # Calculamos el número de filas reales a mostrar
+            num_filas_a_mostrar = min(len(st.session_state.filtered_df), max_filas_a_mostrar)
 
-        # Crea un diccionario con las columnas de texto y su valor de relleno
-        values_to_fill = {
-            'boca': '',
-            'razon_social': '',
-            'nombre_vendedor': '',
-            'direccion': '',
-            'localidad': '',
-            'telefono': '',
-            'email': ''
-        }
+            # Calculamos la altura final
+            alto_df = alto_del_encabezado + alto_de_la_fila * num_filas_a_mostrar
 
-        # Rellena los valores nulos para las columnas de texto en una sola operación
-        st.session_state.filtered_df = st.session_state.filtered_df.fillna(value=values_to_fill)
+            # Rellena los valores nulos para las columnas de texto en una sola operación
+            # Crea un diccionario con las columnas de texto y su valor de relleno
+            values_to_fill = {
+                'boca': '',
+                'razon_social': '',
+                'nombre_vendedor': '',
+                'direccion': '',
+                'localidad': '',
+                'telefono': '',
+                'email': ''
+            }
+            st.session_state.filtered_df = st.session_state.filtered_df.fillna(value=values_to_fill)
 
-        # Rellena el valor nulo para la columna de porcentaje
-        try:
-            st.session_state.filtered_df.loc[:, 'porc_dto'] = st.session_state.filtered_df['porc_dto'].fillna(0.00)
-        except:
-            pass
-        
-        # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
-        df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
+            # Eliminamos valores None en porc_dto
+            try:
+                st.session_state.filtered_df['porc_dto'] = st.session_state.filtered_df['porc_dto'].fillna(0.0)
+            except:
+                pass
 
-        # Insertamos la columna temporal "Seleccionado" solo si no existe
-        if "Seleccionado" not in df_to_show.columns:
-            df_to_show.insert(0, "Seleccionado", False)
+            # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
+            df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
 
-        # Columnas que dejaremos NO editables (todas salvo la columna Seleccionado)
-        disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
+            # Insertamos la columna temporal "Seleccionado" solo si no existe
+            if "Seleccionado" not in df_to_show.columns:
+                df_to_show.insert(0, "Seleccionado", False)
 
-        # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
-        editor_key = f"clientes_grid_{st.session_state.get('grid_version', 0)}"
+            # Columnas que dejaremos NO editables (todas salvo la columna Seleccionado)
+            disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
 
-        def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
-            # Calcula un ancho aproximado en píxeles para una columna del DataFrame
-            # basado en la longitud del valor más largo.
-            if columna in df.columns:
-                # Convertimos todo a string para contar caracteres
-                max_chars = max(len(str(x)) for x in df[columna])
-                max_chars = max(max_chars,len(columna))
+            # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
+            editor_key = f"clientes_grid_{st.session_state.get('grid_version', 0)}"
 
-                # Estimación: ~8 px por carácter + padding extra
-                return max(min_width, max_chars * 8 + padding)
+            def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
+                # Calcula un ancho aproximado en píxeles para una columna del DataFrame
+                # basado en la longitud del valor más largo.
+                if columna in df.columns:
+                    # Convertimos todo a string para contar caracteres
+                    max_chars = max(len(str(x)) for x in df[columna])
+                    max_chars = max(max_chars,len(columna))
+
+                    # Estimación: ~8 px por carácter + padding extra
+                    return max(min_width, max_chars * 8 + padding)
+                else:
+                    return min_width
+
+            # Usar column_config para el formateo de la tabla
+            edited_df = st.data_editor(
+                df_to_show, # <-- Filtrado o no
+                key=editor_key,
+                width="stretch",
+                height=alto_df,
+                hide_index=True,
+                disabled=disabled_cols,
+                column_order=[
+                    'Seleccionado', 'boca', 'razon_social', 'nombre_vendedor', 'direccion', 'localidad', 'telefono', 'email', 'porc_dto', 'fecha_mod'
+                ],
+                column_config={
+                    "Seleccionado": st.column_config.CheckboxColumn("✔",
+                                    help="Marque alguna de estas casillas de verificación para editar el cliente.",
+                                    width=50),
+                    "boca": st.column_config.NumberColumn("Boca",
+                                    width=calcular_ancho_columna(df_to_show,"boca")),
+                    "razon_social": st.column_config.TextColumn("Razón Social",
+                                                            width=calcular_ancho_columna(df_to_show,"razon_social")),
+                    "nombre_vendedor": st.column_config.TextColumn("Vendedor",
+                                                                width=calcular_ancho_columna(df_to_show,"nombre_vendedor")),
+                    "direccion": st.column_config.TextColumn("Dirección",
+                                    width=calcular_ancho_columna(df_to_show,"direccion")),
+                    "localidad": st.column_config.TextColumn("Localidad",
+                                    width=calcular_ancho_columna(df_to_show,"localidad")),
+                    "telefono": st.column_config.TextColumn("Teléfono",
+                                    width=calcular_ancho_columna(df_to_show,"telefono")),
+                    "email": st.column_config.TextColumn("Email",
+                                    width=calcular_ancho_columna(df_to_show,"email")),
+                    "porc_dto": st.column_config.NumberColumn(
+                        "Dto. %",
+                        width=calcular_ancho_columna(df_to_show,"porc_dto"),
+                        format="%.2f"
+                    ),
+                    "fecha_mod": st.column_config.DatetimeColumn(
+                        "Última Modificación",
+                        width=calcular_ancho_columna(df_to_show,"fecha_mod")
+                    )
+                }
+            )
+
+            # --- Detectar selección(s) y cargar el cliente en el form ---
+            selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
+
+            if selected_idxs:
+                # Tomo la primera selección
+                idx = selected_idxs[0]
+                selected_row = edited_df.loc[idx]
+
+                # Guardamos todos los datos de interés en un diccionario temporal
+                st.session_state.selected_client_data = {
+                    "boca": selected_row["boca"],
+                    "razon_social": selected_row["razon_social"],
+                    "direccion": selected_row["direccion"],
+                    "localidad": selected_row["localidad"],
+                    "telefono": selected_row["telefono"],
+                    "email": selected_row["email"],
+                    "porc_dto": float(selected_row["porc_dto"]) if selected_row["porc_dto"] else None,
+                    "nombre_vendedor": selected_row["nombre_vendedor"]
+                }
+
+                st.session_state.boca_exists = True
+                st.session_state.selected_cliente_id = int(selected_row["id"])
+                st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
+
+                st.session_state.view_grilla = False
+                st.rerun()
+
             else:
-                return min_width
-
-        # Usar column_config para el formateo de la tabla
-        edited_df = st.data_editor(
-            df_to_show, # <-- Filtrado o no
-            key=editor_key,
-            width="stretch",
-            height=alto_df,
-            hide_index=True,
-            disabled=disabled_cols,
-            column_order=[
-                'Seleccionado', 'boca', 'razon_social', 'nombre_vendedor', 'direccion', 'localidad', 'telefono', 'email', 'porc_dto', 'fecha_mod'
-            ],
-            column_config={
-                "Seleccionado": st.column_config.CheckboxColumn("✔",
-                                help="Marque alguna de estas casillas de verificación para editar el cliente.",
-                                width=50),
-                "boca": st.column_config.NumberColumn("Boca",
-                                width=calcular_ancho_columna(df_to_show,"boca")),
-                "razon_social": st.column_config.TextColumn("Razón Social",
-                                                           width=calcular_ancho_columna(df_to_show,"razon_social")),
-                "nombre_vendedor": st.column_config.TextColumn("Vendedor",
-                                                            width=calcular_ancho_columna(df_to_show,"nombre_vendedor")),
-                "direccion": st.column_config.TextColumn("Dirección",
-                                width=calcular_ancho_columna(df_to_show,"direccion")),
-                "localidad": st.column_config.TextColumn("Localidad",
-                                width=calcular_ancho_columna(df_to_show,"localidad")),
-                "telefono": st.column_config.TextColumn("Teléfono",
-                                width=calcular_ancho_columna(df_to_show,"telefono")),
-                "email": st.column_config.TextColumn("Email",
-                                width=calcular_ancho_columna(df_to_show,"email")),
-                "porc_dto": st.column_config.NumberColumn(
-                    "Dto. %",
-                    width=calcular_ancho_columna(df_to_show,"porc_dto"),
-                    format="%.2f"
-                ),
-                "fecha_mod": st.column_config.DatetimeColumn(
-                    "Última Modificación",
-                     width=calcular_ancho_columna(df_to_show,"fecha_mod")
-                )
-            }
-        )
-
-        # --- Detectar selección(s) y cargar el cliente en el form ---
-        selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
-
-        if selected_idxs:
-            idx = selected_idxs[0]
-            selected_row = edited_df.loc[idx]
-
-            # Guardamos todos los datos de interés en un diccionario temporal
-            st.session_state.selected_client_data = {
-                "boca": selected_row["boca"],
-                "razon_social": selected_row["razon_social"],
-                "direccion": selected_row["direccion"],
-                "localidad": selected_row["localidad"],
-                "telefono": selected_row["telefono"],
-                "email": selected_row["email"],
-                "porc_dto": float(selected_row["porc_dto"]) if selected_row["porc_dto"] else None,
-                "nombre_vendedor": selected_row["nombre_vendedor"]
-            }
-
-            st.session_state.boca_exists = True
-            st.session_state.selected_cliente_id = int(selected_row["id"])
-            st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
-
-            st.rerun()
+                st.session_state.selected_client_data = {
+                    "boca": None,
+                    "razon_social": "",
+                    "direccion": "",
+                    "localidad": "",
+                    "telefono": "",
+                    "email": "",
+                    "porc_dto": None,
+                    "nombre_vendedor": ""
+                }
 
         else:
-            st.session_state.selected_client_data = {
-                "boca": None,
-                "razon_social": "",
-                "direccion": "",
-                "localidad": "",
-                "telefono": "",
-                "email": "",
-                "porc_dto": None,
-                "nombre_vendedor": ""
-            }
-
+            st.info("No hay clientes registrados.")
     else:
-        st.info("No hay clientes registrados.")
+        message_caption = "ATENCIÓN: La Grilla de Datos para visualización y búsquedas se habilitará "
+        message_caption += "cuando Modifique, Elimine o Limpie el formulario."
+        st.write( "✋ " + message_caption)
 
     st.markdown(f"`{config.FOOTER_APP}`")
 
