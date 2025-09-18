@@ -407,8 +407,11 @@ def clientes_crud():
         st.session_state.filtered_df = st.session_state.filtered_df.fillna(value=values_to_fill)
 
         # Rellena el valor nulo para la columna de porcentaje
-        st.session_state.filtered_df.loc[:, 'porc_dto'] = st.session_state.filtered_df['porc_dto'].fillna(0.00)
-
+        try:
+            st.session_state.filtered_df.loc[:, 'porc_dto'] = st.session_state.filtered_df['porc_dto'].fillna(0.00)
+        except:
+            pass
+        
         # --- Preparar una copia y agregar la columna temporal 'Seleccionado' ---
         df_to_show = st.session_state.filtered_df.copy().reset_index(drop=True)
 
