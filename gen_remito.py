@@ -1,5 +1,6 @@
 import os
 import io
+import streamlit as st
 from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
@@ -24,6 +25,7 @@ def gen_remito(remito_id: int) -> io.BytesIO:
     ws = wb.active
 
     # --- Cabecera ---
+    ws["A3"] = st.secrets["DIRECCION_CLIENTE"]
     ws["A5"] = cab["razon_social"]
     ws["H5"] = cab["boca"] or ""
     ws["H8"] = "Nro." + f'{remito_id:05d}'
