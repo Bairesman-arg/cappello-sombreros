@@ -321,7 +321,8 @@ def get_remito_completo(remito_id: int):
 
         # --- Items ---
         items = pd.read_sql(text("""
-            SELECT a.nro_articulo, a.descripcion, a.precio_real, ri.entregados
+            SELECT a.nro_articulo, a.descripcion, a.precio_real, 
+                    ri.entregados, ri.devueltos, ri.observaciones_item observaciones
             FROM remito_items ri
             JOIN articulos a ON ri.articulo_id = a.id
             WHERE ri.remito_id = :rid
@@ -404,3 +405,54 @@ def check_client_in_remitos(cliente_id):
     with engine.begin() as conn:
         result = conn.execute(text("SELECT COUNT(*) FROM remitos WHERE cliente_id = :id;"), {"id": cliente_id}).scalar()
         return result > 0
+    
+def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df):
+    """
+    Actualiza la cabecera y los items de un remito existente.
+    """
+    with engine.begin() as conn:
+        # Actualizar la cabecera del remito
+        conn.execute(text("""
+            UPDATE remitos
+            SET fecha_retiro = :fr, observaciones = :obs, fecha_mod = CURRENT_TIMESTAMP
+            WHERE id = :rid
+        """), {
+            "fr": fecha_retiro,
+            "obs": observaciones_cabecera,
+            "rid": remito_id
+        })
+
+        # Verificar si la tabla remito_items tiene la columna 'devueltos'
+        # Si no existe, agregarla
+        # try:
+        #    conn.execute(text("ALTER TABLE remito_items ADD COLUMN IF NOT EXISTS devueltos INTEGER DEFAULT 0"))
+        # except Exception:
+        #    pass  # La columna ya existe o hay otro error que podemos ignorar
+
+        # Actualizar los ítems del remito
+        for _, row in items_df.iterrows():
+            # Obtener el ID del artículo
+            articulo_result = conn.execute(text("""
+                SELECT id FROM articulos WHERE nro_articulo = :nro
+            """), {"nro": row["nro_articulo"]}).scalar()
+            
+            if articulo_result:
+                # Preparar valores, manejando posibles valores NaN o None
+                devueltos = int(row.get("devueltos", 0)) if pd.notna(row.get("devueltos")) else 0
+                observaciones = str(row.get("observaciones", "")) if pd.notna(row.get("observaciones")) else ""
+                
+                conn.execute(text("""
+                    UPDATE remito_items
+                    SET observaciones_item = :obs, 
+                        devueltos = :devueltos
+                    WHERE remito_id = :rid
+                    AND articulo_id = :aid
+                """), {
+                    "obs": observaciones if observaciones.strip() else None,
+                    "devueltos": devueltos,
+                    "rid": remito_id,
+                    "aid": articulo_result
+                })
+            else:
+                # Log o manejar el caso donde no se encuentra el artículo
+                print(f"Warning: Artículo {row['nro_articulo']} no encontrado en la base de datos")

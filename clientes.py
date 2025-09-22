@@ -250,10 +250,10 @@ def clientes_crud():
             default_index = 0
 
         st.selectbox(
-            "Vendedor",
+            "Repositor",
             options=vendedor_options,
             key="selected_vendedor",
-            placeholder="Seleccione un vendedor...",
+            placeholder="Seleccione un repositor...",
             disabled=False
         )
 

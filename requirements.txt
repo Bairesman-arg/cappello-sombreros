@@ -8,3 +8,4 @@ sqlalchemy
 python-barcode
 setuptools
 psycopg2-binary
+numpy

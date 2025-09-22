@@ -151,7 +151,7 @@ def remitos():
         st.session_state.cabecera_data['fecha_retiro'] = None
 
     observaciones_cabecera = st.text_area(
-        "Observaciones del Remito",
+        "Observaciones del Remito ( notas privadas )",
         value="",
         key=f"observaciones_cabecera_input_{cabecera_key}",
         disabled=st.session_state.is_form_disabled
@@ -226,7 +226,13 @@ def remitos():
                 'Observaciones': st.session_state.observaciones_item_input,
                 'id_articulo': articulo_info['id']
             }
-            st.session_state.items_data = pd.concat([st.session_state.items_data, pd.DataFrame([new_item])], ignore_index=True)
+            # st.session_state.items_data = pd.concat([st.session_state.items_data, pd.DataFrame([new_item])], ignore_index=True)
+            if not st.session_state.items_data.empty:
+                st.session_state.items_data = pd.concat([st.session_state.items_data, pd.DataFrame([new_item])], ignore_index=True)
+            else:
+                # Si el DataFrame está vacío, simplemente asigna el nuevo ítem
+                st.session_state.items_data = pd.DataFrame([new_item])
+            
             st.session_state.should_clear_items = True
             st.rerun()
 

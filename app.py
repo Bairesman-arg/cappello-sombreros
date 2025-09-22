@@ -7,6 +7,7 @@ from update_art import update_art
 from clientes import clientes_crud
 from articulos import articulos_crud
 from remitos import remitos
+from remitos_ventas import remitos_ventas
 import sys, os, time, traceback
 import datetime
 
@@ -69,8 +70,8 @@ def app():
         if main_menu == "Remitos":
             sub_menu = option_menu(
                 menu_title="Remitos",
-                options=["Entregas"],
-                icons=["file-earmark-plus"],
+                options=["Entregas","Devoluciones y Ventas"],
+                icons=["file-earmark-plus","file-earmark-plus"],
                 menu_icon="folder",
                 default_index=0,
                 orientation="vertical"
@@ -78,7 +79,7 @@ def app():
         elif main_menu == "Artículos":
             sub_menu = option_menu(
                 menu_title="Artículos",
-                options=["Cargar Novedades", "ABM Artículos"],
+                options=["ABM Artículos", "Cargar Novedades"],
                 icons=["file-earmark-plus","file-earmark-plus"],
                 menu_icon="folder",
                 default_index=0,
@@ -100,6 +101,8 @@ def app():
     elif main_menu == "Remitos":
         if sub_menu == "Entregas":
             remitos()
+        if sub_menu == "Devoluciones y Ventas":
+            remitos_ventas()           
 
 if __name__ == "__main__":
     app()
