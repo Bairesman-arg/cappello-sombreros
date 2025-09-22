@@ -6,7 +6,7 @@ from gen_barcode import gen_barcode
 from update_art import update_art
 from clientes import clientes_crud
 from articulos import articulos_crud
-from remitos import remitos
+from remitos_entregas import remitos_entregas
 from remitos_ventas import remitos_ventas
 import sys, os, time, traceback
 import datetime
@@ -100,7 +100,7 @@ def app():
             articulos_crud()
     elif main_menu == "Remitos":
         if sub_menu == "Entregas":
-            remitos()
+            remitos_entregas()
         if sub_menu == "Devoluciones y Ventas":
             remitos_ventas()           
 

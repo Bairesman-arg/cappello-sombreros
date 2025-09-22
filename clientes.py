@@ -127,6 +127,7 @@ def clientes_crud():
         st.session_state.view_grilla = True
     
     st.header("Gestión de Clientes")
+    st.markdown(f"`Seleccione la primera columna de la grilla para modificar o eliminar`")
 
     if not "clientes_df" in st.session_state:
         st.session_state.clientes_df = get_all_clientes()

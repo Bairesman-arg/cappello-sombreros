@@ -60,6 +60,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS remitos (
             id SERIAL PRIMARY KEY,
             cliente_id INTEGER NOT NULL REFERENCES clientes(id),
+            porc_dto REAL,
             fecha_entrega DATE,
             fecha_retiro DATE,
             observaciones TEXT,
@@ -132,23 +133,25 @@ def init_db():
             
 def get_clients_and_articles():
     with engine.begin() as conn:
-        clientes_df = pd.read_sql("SELECT id, razon_social, boca FROM clientes", conn)
+        clientes_df = pd.read_sql("SELECT id, razon_social, boca, porc_dto FROM clientes", conn)
         articulos_df = pd.read_sql("SELECT id, nro_articulo, descripcion, precio_publico FROM articulos", conn)
     return clientes_df, articulos_df
 
-def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, items_df):
+def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, porc_dto, items_df):
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     with engine.begin() as conn:
         result = conn.execute(text("""
-            INSERT INTO remitos (cliente_id, fecha_entrega, fecha_retiro, observaciones, fecha_alta, fecha_mod)
-            VALUES (:cid, :fe, :fr, :obs, :fc, :fm)
+            INSERT INTO remitos (cliente_id, fecha_entrega, 
+                                   fecha_retiro, observaciones, porc_dto, fecha_alta, fecha_mod)
+            VALUES (:cid, :fe, :fr, :obs, :pd, :fc, :fm)
             RETURNING id
         """), {
             "cid": int(cliente_id),
             "fe": fecha_entrega,
             "fr": fecha_retiro,
             "obs": observaciones_cabecera,
+            "pd": porc_dto,
             "fc": fecha_actual,
             "fm": fecha_actual
         })
