@@ -6,6 +6,7 @@ from update_art import update_art
 from clientes import clientes_crud
 from articulos import articulos_crud
 from remitos_ventas import remitos_ventas
+from remitos_anulaciones import remitos_anulaciones
 import remitos_entregas as rem_ent
 import sys, os, time, traceback
 import datetime
@@ -74,8 +75,8 @@ def app():
         # Definición de submenús y lógica por página...
         if mainmenu == "Remitos":
             submenu = option_menu(menu_title="Remitos",
-                                      options=["Entregas", "Devoluciones y Ventas"],
-                                      icons=["file-earmark-plus", "file-earmark-plus"],
+                                      options=["Entregas", "Devoluciones y Ventas", "Anulaciones"],
+                                      icons=["file-earmark-plus", "file-earmark-plus", "file-earmark-plus"],
                                       menu_icon="folder", default_index=0, orientation="vertical")
 
         elif mainmenu == "Articulos":
@@ -104,6 +105,8 @@ def app():
             rem_ent.remitos_entregas()
         elif submenu == "Devoluciones y Ventas":
             remitos_ventas()
+        elif submenu == "Anulaciones":
+            remitos_anulaciones()
 
 if __name__ == '__main__':
     app()

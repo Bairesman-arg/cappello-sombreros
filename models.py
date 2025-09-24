@@ -548,36 +548,28 @@ def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df
                 print(f"Warning: Artículo {row['nro_articulo']} no encontrado en la base de datos")
 
 
-### --- ###
-def save_remito_ELIMINAR(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, porc_dto, items_df):
-    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+def delete_remito(remito_id):
+    """
+    Elimina completamente un remito y todos sus items asociados.
+    Retorna True si se eliminó correctamente, False si no se encontró el remito.
+    """
     with engine.begin() as conn:
-        result = conn.execute(text("""
-            INSERT INTO remitos (cliente_id, fecha_entrega, 
-                                   fecha_retiro, observaciones, porc_dto, fecha_alta, fecha_mod)
-            VALUES (:cid, :fe, :fr, :obs, :pd, :fc, :fm)
-            RETURNING id
-        """), {
-            "cid": int(cliente_id),
-            "fe": fecha_entrega,
-            "fr": fecha_retiro,
-            "obs": observaciones_cabecera,
-            "pd": porc_dto,
-            "fc": fecha_actual,
-            "fm": fecha_actual
-        })
-        remito_id = result.scalar()
-
-        for _, row in items_df.iterrows():
-            conn.execute(text("""
-                INSERT INTO remito_items (remito_id, articulo_id, entregados, observaciones_item)
-                VALUES (:rid, :aid, :ent, :obs)
-            """), {
-                "rid": int(remito_id),
-                "aid": int(row["id_articulo"]),
-                "ent": int(row["Entregados"]),
-                "obs": str(row["Observaciones"])  if row["Observaciones"] else None
-            })
-
-    return remito_id
+        # Verificar si el remito existe
+        exists = conn.execute(text("""
+            SELECT COUNT(*) FROM remitos WHERE id = :rid
+        """), {"rid": remito_id}).scalar()
+        
+        if exists == 0:
+            return False
+        
+        # Eliminar primero los items (por la foreign key)
+        conn.execute(text("""
+            DELETE FROM remito_items WHERE remito_id = :rid
+        """), {"rid": remito_id})
+        
+        # Luego eliminar el remito
+        conn.execute(text("""
+            DELETE FROM remitos WHERE id = :rid
+        """), {"rid": remito_id})
+        
+        return True
