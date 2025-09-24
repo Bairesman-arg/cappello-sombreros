@@ -13,17 +13,44 @@ def remitos_ventas():
     st.title(config.TITULO_APP)
     st.header("Remitos - Devoluciones y Ventas")
 
-    # Inicializamos la variable de estado para los botones de confirmación
+    # Inicializamos las variables de estado para los botones de confirmación
     if "confirmar_nuevo" not in st.session_state:
         st.session_state["confirmar_nuevo"] = False
+    if "show_confirm_modal" not in st.session_state:
+        st.session_state.show_confirm_modal = False
+    if "is_form_disabled" not in st.session_state:
+        st.session_state.is_form_disabled = False
+    if "should_reset_all" not in st.session_state:
+        st.session_state.should_reset_all = False
 
-    if  st.session_state["confirmar_nuevo"]:
+    if st.session_state["confirmar_nuevo"]:
         st.session_state["input_remito"] = 1
 
     if "remito_grabado" not in st.session_state:
         st.session_state.remito_grabado = False
     if "error_grabacion" not in st.session_state:
         st.session_state.error_grabacion = False
+    if "success_shown" not in st.session_state:
+        st.session_state.success_shown = False
+    if "remito_saved" not in st.session_state:
+        st.session_state.remito_saved = False
+
+    # Manejo de flags de rerun
+    if st.session_state.should_reset_all:
+        # Limpiar session state para nuevo remito
+        keys_to_clear = ["remito_activo"] + [k for k in st.session_state.keys() if k.startswith("remito_")]
+        for k in keys_to_clear:
+            st.session_state.pop(k, None)
+        st.session_state.should_reset_all = False
+        st.session_state.show_confirm_modal = False
+        st.session_state.is_form_disabled = False
+        st.session_state.success_shown = False
+        st.session_state.remito_saved = False
+        st.session_state.input_remito = 1
+        st.rerun()
+
+    # Control de estado del formulario
+    st.session_state.is_form_disabled = st.session_state.show_confirm_modal
 
     # --- Entrada de número de remito ---
     col1, _ = st.columns([1, 4], gap="small")
@@ -36,15 +63,13 @@ def remitos_ventas():
             if datos:
                 items = datos["cabecera"]
                 items_df = datos["items"].copy()
-                
-                # Agregar columnas editables
-                # items_df["Devueltos"] = 0
-                # items_df["Observaciones"] = ""
-                
+                                
                 st.session_state[f"remito_{remito_id}_cab"] = items
                 st.session_state[f"remito_{remito_id}_items"] = items_df
                 st.session_state["remito_activo"] = remito_id
                 st.session_state["carga_exitosa"] = True
+                st.session_state.remito_saved = False  # Reset cuando se carga un nuevo remito
+                st.session_state.success_shown = False
             else:
                 st.session_state["carga_exitosa"] = False
 
@@ -55,7 +80,8 @@ def remitos_ventas():
             step=1, 
             key="input_remito",
             on_change=cargar_remito_auto,
-            help="Ingrese un Remito existente para editar."
+            help="Ingrese un Remito existente para editar.",
+            disabled=st.session_state.is_form_disabled
         )
 
     # Mostrar mensajes después de cualquier carga
@@ -89,9 +115,10 @@ def remitos_ventas():
                 )
                 nueva_fecha_retiro = st.date_input(
                     "Fecha de Retiro",
-                    value=date.today(),
+                    value=cab["fecha_retiro"],
                     format="DD/MM/YYYY",
-                    key=f"fecha_retiro_{remito_id}"
+                    key=f"fecha_retiro_{remito_id}",
+                    disabled=st.session_state.is_form_disabled
                 )
 
             with col_der:
@@ -99,10 +126,10 @@ def remitos_ventas():
                     "Observaciones del Remito  ( notas privadas )",
                     value=cab.get("observaciones") or "",
                     key=f"obs_remito_{remito_id}",
-                    height=150
+                    height=150,
+                    disabled=st.session_state.is_form_disabled
                 )
 
-            #   st.divider()
             st.subheader("Items del Remito")
 
             col_edit, col_calc = st.columns([4, 1], gap="small")
@@ -128,7 +155,7 @@ def remitos_ventas():
                         ),
                         "Observaciones": st.column_config.TextColumn("observaciones", width="medium"),
                     },
-                    disabled=["nro_articulo", "descripcion", "entregados"],
+                    disabled=["nro_articulo", "descripcion", "entregados"] + (["devueltos", "observaciones"] if st.session_state.is_form_disabled else []),
                     key=f"editor_{remito_id}",
                     num_rows="fixed"
                 )
@@ -148,6 +175,7 @@ def remitos_ventas():
                             df_editado.loc[row_idx, col_name] = new_value
             
             # VALIDAR que devueltos no superen entregados
+            items_invalidos = pd.DataFrame()
             try:
                 if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
                     items_invalidos = df_editado[df_editado["devueltos"] > df_editado["entregados"]]
@@ -162,8 +190,6 @@ def remitos_ventas():
                 
                 # Calcular vendidos con el DataFrame actualizado
                 if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
-                    # vendidos_valores = df_editado["entregados"] - df_editado["devueltos"]
-                    # vendidos_valores = df_editado["devueltos"] if df_editado["devueltos"] == 0 else df_editado["entregados"] - df_editado["devueltos"]
                     vendidos_valores = np.where(df_editado["devueltos"] == 0, 0, 
                              df_editado["entregados"] - df_editado["devueltos"])
 
@@ -196,94 +222,114 @@ def remitos_ventas():
             c2.metric("Total Devueltos", total_devueltos)
             c3.metric("Total Vendidos", total_vendidos)
 
-            # --- Botones de acción ---
-            col_g, col_n, col_i = st.columns(3)
+            # === BOTONES PRINCIPALES (siguiendo la lógica de remitos_entregas.py) ===
+            st.header("Acciones del Remito")
 
-            with col_g:
-                # Verificar que no haya errores de validación antes de guardar
-                items_invalidos = df_editado[df_editado["devueltos"] > df_editado["entregados"]]
-                tiene_errores = not items_invalidos.empty
-                
-                if st.button("Guardar Remito", type="primary", width="stretch", key=f"btn_guardar_{remito_id}", disabled=tiene_errores):
-                    try:
-                        update_remito_data(
-                            remito_id=remito_id,
-                            fecha_retiro=nueva_fecha_retiro,
-                            observaciones_cabecera=nuevas_observaciones,
-                            items_df=df_editado
-                        )
-                        # st.success("✅ Remito actualizado con éxito.")
-                        st.session_state.remito_grabado = True
+            # Verificar que no haya errores de validación
+            tiene_errores = not items_invalidos.empty
+            is_remito_saved = st.session_state.remito_saved
+            can_save = not tiene_errores  # En ventas, solo necesitamos que no haya errores
 
-                    except Exception as e:
-                        # st.error(f"❌ Error al guardar: {str(e)}")
-                        st.session_state.error_grabacion = True
-                        
-                if tiene_errores:
-                    st.caption("⚠️ Botón deshabilitado por errores de validación")
+            col_buttons = st.columns(3, gap="small")
 
-            with col_n:
-                # Este botón solo activa la variable de estado
-                if st.button("Nuevo Remito", width="stretch", key=f"btn_nuevo_{remito_id}"):
-                    # st.session_state["confirmar_nuevo"] = True
-                    keys_to_clear = ["remito_cab", "remito_items", "remito_activo"]
-                    for k in keys_to_clear:
-                        st.session_state.pop(k, None)
+            # Botón Guardar
+            say_error = False
+            with col_buttons[0]:
+                if st.button("Guardar Remito", type="primary", use_container_width=True,
+                            disabled=st.session_state.is_form_disabled or is_remito_saved or tiene_errores):
+                    if not can_save:
+                        say_error = True
+                    else:
+                        try:
+                            update_remito_data(
+                                remito_id=remito_id,
+                                fecha_retiro=nueva_fecha_retiro,
+                                observaciones_cabecera=nuevas_observaciones,
+                                items_df=df_editado
+                            )
+                            st.session_state.remito_saved = True
+                            st.session_state.success_shown = False  # Para mostrar el mensaje
+                            # Forzar rerun para actualizar el estado de los botones
+                            st.rerun()
+                        except Exception as e:
+                            st.session_state.error_grabacion = True
+                            st.rerun()
 
-                    st.session_state["confirmar_nuevo"] = False
-                    st.toast("¡Acción completada con éxito!", icon="👍")
-                    # time.sleep(0.5)
+            # Botón Nuevo Remito
+            with col_buttons[1]:
+                nuevo_remito_disabled = st.session_state.is_form_disabled
+
+                if st.button("Nuevo Remito", use_container_width=True,
+                            disabled=nuevo_remito_disabled):
+                    # Siempre mostrar modal de confirmación en ventas
+                    st.session_state.show_confirm_modal = True
                     st.rerun()
-                """    
-                # Esta condición se encarga de mostrar los botones de confirmación
-                if st.session_state["confirmar_nuevo"]:
-                    #  st.warning("⚠️ Se perderán los cambios ¿Está seguro?")
-                    #  col_confirm_nuevo, col_espacio, col_cancelar = st.columns([1, 4, 1])
-                    col_confirm_nuevo, col_cancelar = st.columns([1, 1])
-                    with col_confirm_nuevo:
-                        if st.button("Confirmar", type="primary", 
-                                     key="btn_confirmar_nuevo", 
-                                     width="stretch", 
-                                     help="Se perderán los cambios ¿Está seguro?"):
-                            # Limpiar session state
-                            keys_to_clear = ["remito_cab", "remito_items", "remito_activo"]
-                            for k in keys_to_clear:
-                                st.session_state.pop(k, None)
 
-                            st.session_state["confirmar_nuevo"] = False
-                            st.toast("¡Acción completada con éxito!", icon="👍")
-                            # time.sleep(0.5)
-                            st.rerun()
-
-                    with col_cancelar:
-                        if st.button("Cancelar", key="btn_cancelar_nuevo", width="stretch"):
-                            st.session_state["confirmar_nuevo"] = False
-                            st.rerun()
-                """
-            with col_i:
-                if st.button("Imprimir Remito", width="stretch", key=f"btn_imprimir_{remito_id}"):
+            # Botón Generar/Descargar Remito
+            with col_buttons[2]:
+                if is_remito_saved:
                     try:
-                        # Aquí iría la lógica de gen_remito
-                        pdf_data = gen_remito(remito_id, df_editado)
-                        st.download_button(
-                            "📄 Descargar Remito",
-                            data=pdf_data,
-                            file_name=f"Remito_{remito_id}_{datetime.now().strftime('%Y%m%d')}.pdf",
-                            mime="application/pdf",
-                            width="stretch",
-                            key=f"btn_download_{remito_id}"
+                        excel_buffer = gen_remito(remito_id, is_retiro=True)
+                        
+                        # Crear un contenedor para el botón y manejar la descarga
+                        download_clicked = st.download_button(
+                            label=f"Descargar Remito #{remito_id}",
+                            use_container_width=True,
+                            data=excel_buffer,
+                            file_name=f"Remito_{remito_id}_Ventas.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"download_remito_{remito_id}"
                         )
+                        
+                        # Después de la descarga, resetear automáticamente sin confirmación
+                        if download_clicked:
+                            st.session_state.should_reset_all = True
+                            st.rerun()
+                            
                     except Exception as e:
-                        st.error(f"❌ Error al generar el remito: {str(e)}")
+                        st.error(f"Error al generar el remito: {str(e)}")
+                        if st.button("Generar Remito", use_container_width=True, disabled=True):
+                            pass
+                else:
+                    st.button("Generar Remito", use_container_width=True, disabled=True)
 
-            if st.session_state.remito_grabado:
+            if say_error:
+                st.error("Hay errores de validación que deben corregirse antes de guardar.")
+
+            if tiene_errores:
+                st.caption("⚠️ Botón Guardar deshabilitado por errores de validación")
+
+            # Mensaje de éxito fuera de las columnas (ocupa todo el ancho)
+            if st.session_state.remito_saved and not st.session_state.get('success_shown', False):
+                st.success(f"🎉 Remito #{remito_id} actualizado con éxito!")
                 st.balloons()
-                st.success("✅ Remito actualizado con éxito.")
-            if st.session_state.error_grabacion:
-                st.error(f"❌ Error al guardar: {str(e)}")
+                # Marcar que ya se mostró el mensaje para evitar que se repita
+                st.session_state.success_shown = True
 
-            st.session_state.remito_grabado = False
-            st.session_state.error_grabacion = False
+            # Mensaje de error
+            if st.session_state.error_grabacion:
+                st.error("❌ Error al guardar el remito.")
+                st.session_state.error_grabacion = False
+
+            # === MODAL DE CONFIRMACIÓN (siguiendo la lógica de remitos_entregas.py) ===
+            if st.session_state.show_confirm_modal:
+                st.warning("¿Desea continuar y cargar un nuevo remito? Se perderán los cambios no guardados.")
+
+                col_confirm, col_cancel, _ = st.columns([1, 1, 1], gap="small")
+
+                with col_confirm:
+                    if st.button("Sí, continuar", width="stretch"):
+                        st.session_state.show_confirm_modal = False
+                        st.session_state.should_reset_all = True
+                        st.rerun()
+
+                with col_cancel:
+                    if st.button("Cancelar", width="stretch"):
+                        st.session_state.show_confirm_modal = False
+                        st.rerun()
+
+    # Footer
+    st.markdown(f"`{config.FOOTER_APP}`")
 
 if __name__ == "__main__":
     remitos_ventas()

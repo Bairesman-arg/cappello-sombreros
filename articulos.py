@@ -70,6 +70,7 @@ def on_add_click():
             )
             set_status_message(f"➕ Artículo '{nro_to_save}' agregado con éxito.", "success")
             clear_inputs()
+            config.init_clientes_articulos()
         except Exception as e:
             set_status_message(f"❌ Error al agregar el artículo: {e}", "error")
 
@@ -90,9 +91,10 @@ def on_mod_click():
                 int(rubro_id) # <-- Pasar el ID del rubro
             )
             set_status_message(f"✍️ Artículo '{st.session_state.nro_articulo_final}' modificado con éxito.", "success")
-            st.session_state.do_filter = True # Obligo a refrescar la grilla
+            st.session_state.do_filter = True # Obligo a refrescar la grilla            
             clear_inputs()
             st.session_state.view_grilla = True
+            config.init_clientes_articulos()
         except Exception as e:
             set_status_message(f"❌ Error al modificar el artículo: {e}", "error")
 
@@ -328,7 +330,7 @@ def articulos_crud():
         st.warning("⚠️ ¿Está seguro que desea eliminar este artículo? Esta acción no se puede deshacer.")
         col_confirm_del, col_cancel_del, _, _ = st.columns(4, gap="small")
         with col_confirm_del:
-            if st.button("Confirmar Eliminación", type="primary"):
+            if st.button("Confirmar Eliminación", type="primary", width="stretch"):
                 try:
                     delete_existing_articulo(st.session_state.selected_articulo_id)
                     set_status_message(f"🗑️ Artículo '{st.session_state.nro_articulo_final}' eliminado con éxito.", "success")
@@ -337,13 +339,14 @@ def articulos_crud():
                     st.session_state.was_eliminated = True
                     st.session_state.do_filter = True # Obligo a refrescar la grilla
                     st.session_state.view_grilla = True
+                    config.init_clientes_articulos()
                     st.rerun()
                 except Exception as e:
                     set_status_message(f"❌ Error al eliminar el artículo: {e}", "error")
                     st.rerun()
 
         with col_cancel_del:
-            if st.button("Cancelar Eliminación ❌"):
+            if st.button("Cancelar Eliminación ❌", width="stretch"):
                 st.session_state.show_delete_modal = False
                 st.rerun()
 

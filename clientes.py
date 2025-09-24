@@ -50,8 +50,8 @@ def valida_datos():
         set_status_message("❌ El 'Número de Boca' debe ser mayor a cero.", "error")
     elif not st.session_state.razon_social_final:
         set_status_message("❌ La 'Razón Social' no puede estar vacía.", "error")
-    elif st.session_state.porc_dto_final < 0:
-        set_status_message("❌ El 'Porcentaje de Descuento' no puede ser negativo.", "error")
+    elif st.session_state.porc_dto_final <= 0:
+        set_status_message("❌ El 'Porcentaje de Descuento' no puede ser negativo o cero.", "error")
     else:
         valida = True
     return valida
@@ -72,6 +72,7 @@ def on_add_click():
                 int(vendedor_id)
             )
             set_status_message(f"➕ Cliente '{st.session_state.razon_social_final}' agregado con éxito.", "success")
+            config.init_clientes_articulos()
             clear_inputs()
         except Exception as e:
             set_status_message(f"❌ Error al agregar el cliente: {e}", "error")
@@ -100,6 +101,7 @@ def on_mod_click():
             )
             set_status_message(f"✍️ Cliente '{st.session_state.razon_social_final}' modificado con éxito.", "success")
             st.session_state.do_filter = True # Obligo a refrescar la grilla
+            config.init_clientes_articulos()
             clear_inputs()
             st.session_state.view_grilla = True
         except Exception as e:
@@ -349,7 +351,7 @@ def clientes_crud():
         st.warning("⚠️ ¿Está seguro que desea eliminar este cliente? Esta acción no se puede deshacer.")
         col_confirm_del, col_cancel_del, _, _ = st.columns(4,gap="small")
         with col_confirm_del:
-            if st.button("Confirmar Eliminación", type="primary"):
+            if st.button("Confirmar Eliminación", type="primary", width="stretch"):
                 try:
                     delete_existing_cliente(st.session_state.selected_cliente_id)
                     set_status_message(f"🗑️ Cliente '{st.session_state.razon_social_final}' eliminado con éxito.", "success")
@@ -358,13 +360,14 @@ def clientes_crud():
                     st.session_state.was_eliminated = True
                     st.session_state.do_filter = True # Obligo a refrescar la grilla
                     st.session_state.view_grilla = True
+                    config.init_clientes_articulos()
                     st.rerun()
                 except Exception as e:
                     set_status_message(f"❌ Error al eliminar el cliente: {e}", "error")
                     st.rerun()
 
         with col_cancel_del:
-            if st.button("Cancelar Eliminación ❌"):
+            if st.button("Cancelar Eliminación ❌", width="stretch"):
                 st.session_state.show_delete_modal = False
                 st.rerun()
 

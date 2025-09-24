@@ -75,7 +75,8 @@ def init_db():
             remito_id INTEGER NOT NULL REFERENCES remitos(id),
             articulo_id INTEGER NOT NULL REFERENCES articulos(id),
             entregados INTEGER NOT NULL,
-            observaciones_item TEXT
+            observaciones_item TEXT,
+            precio_real_item REAL NOT NULL -- Columna para guardar el precio real en el momento de la venta/consignación
         );
         """))
 
@@ -134,41 +135,127 @@ def init_db():
 def get_clients_and_articles():
     with engine.begin() as conn:
         clientes_df = pd.read_sql("SELECT id, razon_social, boca, porc_dto FROM clientes", conn)
-        articulos_df = pd.read_sql("SELECT id, nro_articulo, descripcion, precio_publico FROM articulos", conn)
+        # Se agrega la columna 'precio_real' a la consulta.
+        articulos_df = pd.read_sql("SELECT id, nro_articulo, descripcion, precio_publico, precio_real FROM articulos", conn)
     return clientes_df, articulos_df
 
 def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, porc_dto, items_df):
-    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+    fecha_actual = datetime.now()
+    
     with engine.begin() as conn:
-        result = conn.execute(text("""
-            INSERT INTO remitos (cliente_id, fecha_entrega, 
-                                   fecha_retiro, observaciones, porc_dto, fecha_alta, fecha_mod)
-            VALUES (:cid, :fe, :fr, :obs, :pd, :fc, :fm)
-            RETURNING id
-        """), {
-            "cid": int(cliente_id),
-            "fe": fecha_entrega,
-            "fr": fecha_retiro,
-            "obs": observaciones_cabecera,
-            "pd": porc_dto,
-            "fc": fecha_actual,
-            "fm": fecha_actual
-        })
-        remito_id = result.scalar()
+        # Buscar el remito existente por cliente y fechas
+        query = text("""
+            SELECT id FROM remitos WHERE cliente_id = :cliente_id AND fecha_entrega = :fecha_entrega AND fecha_retiro IS NULL
+        """)
+        # Convertir cliente_id a int
+        remito_id_result = conn.execute(query, {
+            "cliente_id": int(cliente_id),
+            "fecha_entrega": fecha_entrega,
+        }).scalar()
 
-        for _, row in items_df.iterrows():
+        if remito_id_result:
+            remito_id = remito_id_result
             conn.execute(text("""
-                INSERT INTO remito_items (remito_id, articulo_id, entregados, observaciones_item)
-                VALUES (:rid, :aid, :ent, :obs)
+                UPDATE remitos
+                SET fecha_mod = :now, porc_dto = :porc_dto, observaciones = :obs
+                WHERE id = :rid
             """), {
-                "rid": int(remito_id),
-                "aid": int(row["id_articulo"]),
-                "ent": int(row["Entregados"]),
-                "obs": str(row["Observaciones"])  if row["Observaciones"] else None
+                "now": fecha_actual,
+                "porc_dto": porc_dto,
+                "obs": observaciones_cabecera,
+                "rid": remito_id
             })
+            
+            # Borrar ítems antiguos para evitar duplicados
+            conn.execute(text("""
+                DELETE FROM remito_items WHERE remito_id = :rid
+            """), {"rid": remito_id})
 
-    return remito_id
+            # Variable para rastrear si se modificó algún precio
+            precios_modificados = False
+
+            # Se itera sobre el DataFrame para guardar cada item y actualizar precios.
+            for _, row in items_df.iterrows():
+                # Convertir a int el ID del artículo
+                articulo_id = int(row['id_articulo'])
+                
+                # Obtener el precio_real actual de la base de datos
+                current_price_result = conn.execute(text("SELECT precio_real FROM articulos WHERE id = :aid"), 
+                                                    {"aid": articulo_id}).scalar()
+                
+                # Se compara el precio del DataFrame editado con el de la base de datos.
+                if current_price_result != row['Precio Real']:
+                    # Si el precio es diferente, se actualiza en la tabla de articulos.
+                    conn.execute(text("""
+                        UPDATE articulos
+                        SET precio_real = :new_price, fecha_mod = :now
+                        WHERE id = :aid
+                    """), {
+                        "new_price": row['Precio Real'],
+                        "now": fecha_actual,
+                        "aid": articulo_id
+                    })
+                    precios_modificados = True # Se marca que hubo una modificación.
+
+                # Insertar el nuevo item, incluyendo el precio real de ese item
+                conn.execute(text("""
+                    INSERT INTO remito_items (remito_id, articulo_id, entregados, observaciones_item, precio_real_item)
+                    VALUES (:remito_id, :articulo_id, :entregados, :observaciones, :precio_real)
+                """), {
+                    "remito_id": remito_id,
+                    "articulo_id": articulo_id,
+                    "entregados": int(row["Entregados"]), # Convertir a int
+                    "observaciones": row["Observaciones"] if pd.notna(row["Observaciones"]) else None,
+                    "precio_real": row["Precio Real"] # ¡SE GUARDA EL PRECIO DEL ÍTEM!
+                })
+            
+            return remito_id, precios_modificados
+
+        else:
+            # Lógica para crear un nuevo remito
+            result = conn.execute(text("""
+                INSERT INTO remitos (cliente_id, porc_dto, fecha_entrega, observaciones, fecha_alta, fecha_mod)
+                VALUES (:cid, :porc_dto, :fecha_entrega, :obs, :now, :now)
+                RETURNING id
+            """), {
+                "cid": int(cliente_id), # Convertir a int
+                "porc_dto": porc_dto,
+                "fecha_entrega": fecha_entrega,
+                "obs": observaciones_cabecera,
+                "now": fecha_actual
+            })
+            remito_id = result.scalar()
+
+            precios_modificados = False
+            for _, row in items_df.iterrows():
+                articulo_id = int(row['id_articulo']) # Convertir a int
+                current_price_result = conn.execute(text("SELECT precio_real FROM articulos WHERE id = :aid"), 
+                                                    {"aid": articulo_id}).scalar()
+                
+                if current_price_result != row['Precio Real']:
+                    conn.execute(text("""
+                        UPDATE articulos
+                        SET precio_real = :new_price, fecha_mod = :now
+                        WHERE id = :aid
+                    """), {
+                        "new_price": row['Precio Real'],
+                        "now": fecha_actual,
+                        "aid": articulo_id
+                    })
+                    precios_modificados = True
+                
+                conn.execute(text("""
+                    INSERT INTO remito_items (remito_id, articulo_id, entregados, observaciones_item, precio_real_item)
+                    VALUES (:remito_id, :articulo_id, :entregados, :observaciones, :precio_real)
+                """), {
+                    "remito_id": remito_id,
+                    "articulo_id": articulo_id,
+                    "entregados": int(row["Entregados"]), # Convertir a int
+                    "observaciones": row["Observaciones"] if pd.notna(row["Observaciones"]) else None,
+                    "precio_real": row["Precio Real"] # ¡SE GUARDA EL PRECIO DEL ÍTEM!
+                })
+            
+            return remito_id, precios_modificados
 
 # --- Nuevas funciones para el CRUD de artículos y rubros---
 def get_all_rubros():
@@ -311,7 +398,7 @@ def get_remito_completo(remito_id: int):
     with engine.begin() as conn:
         # --- Cabecera ---
         cabecera = conn.execute(text("""
-            SELECT r.id AS remito_id, r.fecha_entrega, r.observaciones,
+            SELECT r.id AS remito_id, r.fecha_entrega, r.fecha_retiro, r.observaciones,
                    c.razon_social, c.boca, c.direccion, c.localidad, c.telefono,
                    COALESCE(c.porc_dto, 1) AS porc_dto
             FROM remitos r
@@ -459,3 +546,38 @@ def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df
             else:
                 # Log o manejar el caso donde no se encuentra el artículo
                 print(f"Warning: Artículo {row['nro_articulo']} no encontrado en la base de datos")
+
+
+### --- ###
+def save_remito_ELIMINAR(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, porc_dto, items_df):
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with engine.begin() as conn:
+        result = conn.execute(text("""
+            INSERT INTO remitos (cliente_id, fecha_entrega, 
+                                   fecha_retiro, observaciones, porc_dto, fecha_alta, fecha_mod)
+            VALUES (:cid, :fe, :fr, :obs, :pd, :fc, :fm)
+            RETURNING id
+        """), {
+            "cid": int(cliente_id),
+            "fe": fecha_entrega,
+            "fr": fecha_retiro,
+            "obs": observaciones_cabecera,
+            "pd": porc_dto,
+            "fc": fecha_actual,
+            "fm": fecha_actual
+        })
+        remito_id = result.scalar()
+
+        for _, row in items_df.iterrows():
+            conn.execute(text("""
+                INSERT INTO remito_items (remito_id, articulo_id, entregados, observaciones_item)
+                VALUES (:rid, :aid, :ent, :obs)
+            """), {
+                "rid": int(remito_id),
+                "aid": int(row["id_articulo"]),
+                "ent": int(row["Entregados"]),
+                "obs": str(row["Observaciones"])  if row["Observaciones"] else None
+            })
+
+    return remito_id
