@@ -207,11 +207,6 @@ def remitos_anulaciones():
     # === MODAL DE CONFIRMACIÓN ===
     if st.session_state.show_confirm_modal:
         st.warning(f"¿Está COMPLETAMENTE SEGURO que desea anular el Remito #{st.session_state['remito_activo']}?")
-        st.markdown("**Esta acción:**")
-        st.markdown("- ❌ Eliminará PERMANENTEMENTE el remito")
-        st.markdown("- ❌ Eliminará TODOS los items asociados")
-        st.markdown("- ❌ NO se puede deshacer")
-
         col_confirm, col_cancel = st.columns(2, gap="small")
 
         with col_confirm:

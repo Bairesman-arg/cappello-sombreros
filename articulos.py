@@ -120,7 +120,7 @@ def articulos_crud():
         st.session_state.view_grilla = True
 
     st.header("Gestión de Artículos")
-    st.markdown(f"`Seleccione la primera columna de la grilla para modificar o eliminar`")
+    st.markdown(f"`Seleccione la primera columna de la grilla inferior para modificar o eliminar`")
 
     if not "articulos_df" in st.session_state: 
         st.session_state.articulos_df = get_all_articulos()
@@ -468,12 +468,12 @@ def articulos_crud():
                         format="$ %.2f"
                     ),
                     "precio_real": st.column_config.NumberColumn(
-                        "Real al Público",
+                        "Real Público",
                         width=calcular_ancho_columna(df_to_show,"precio_real"),
                         format="$ %.2f"
                     ),
                     "precio_publico": st.column_config.NumberColumn(
-                        "Precio al Público",
+                        "Precio Público",
                         width=calcular_ancho_columna(df_to_show,"precio_publico"),
                         format="$ %.2f"
                     ),

@@ -129,7 +129,7 @@ def clientes_crud():
         st.session_state.view_grilla = True
     
     st.header("Gestión de Clientes")
-    st.markdown(f"`Seleccione la primera columna de la grilla para modificar o eliminar`")
+    st.markdown(f"`Seleccione la primera columna de la grilla inferior para modificar o eliminar`")
 
     if not "clientes_df" in st.session_state:
         st.session_state.clientes_df = get_all_clientes()
@@ -419,7 +419,7 @@ def clientes_crud():
 
             # --- Parámetros de configuración ---
             max_filas_a_mostrar = 20
-            alto_del_encabezado = 35
+            alto_del_encabezado = 36
             alto_de_la_fila = 35
 
             # --- Lógica para ajustar la altura ---
@@ -483,7 +483,7 @@ def clientes_crud():
                 hide_index=True,
                 disabled=disabled_cols,
                 column_order=[
-                    'Seleccionado', 'boca', 'razon_social', 'nombre_vendedor', 'direccion', 'localidad', 'telefono', 'email', 'porc_dto', 'fecha_mod'
+                    'Seleccionado', 'boca', 'razon_social', 'nombre_vendedor', 'direccion', 'localidad', 'telefono', 'porc_dto', 'email', 'fecha_mod'
                 ],
                 column_config={
                     "Seleccionado": st.column_config.CheckboxColumn("✔",
@@ -493,21 +493,20 @@ def clientes_crud():
                                     width=calcular_ancho_columna(df_to_show,"boca")),
                     "razon_social": st.column_config.TextColumn("Razón Social",
                                                             width=calcular_ancho_columna(df_to_show,"razon_social")),
-                    "nombre_vendedor": st.column_config.TextColumn("Vendedor",
-                                                                width=calcular_ancho_columna(df_to_show,"nombre_vendedor")),
+                    "nombre_vendedor": st.column_config.TextColumn("Vendedor", width="small"),
                     "direccion": st.column_config.TextColumn("Dirección",
                                     width=calcular_ancho_columna(df_to_show,"direccion")),
                     "localidad": st.column_config.TextColumn("Localidad",
                                     width=calcular_ancho_columna(df_to_show,"localidad")),
                     "telefono": st.column_config.TextColumn("Teléfono",
                                     width=calcular_ancho_columna(df_to_show,"telefono")),
-                    "email": st.column_config.TextColumn("Email",
-                                    width=calcular_ancho_columna(df_to_show,"email")),
                     "porc_dto": st.column_config.NumberColumn(
                         "Dto. %",
                         width=calcular_ancho_columna(df_to_show,"porc_dto"),
                         format="%.2f"
                     ),
+                    "email": st.column_config.TextColumn("Email",
+                                    width=calcular_ancho_columna(df_to_show,"email")),
                     "fecha_mod": st.column_config.DatetimeColumn(
                         "Última Modificación",
                         width=calcular_ancho_columna(df_to_show,"fecha_mod")
