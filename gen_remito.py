@@ -54,10 +54,13 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
 
     # --- Fecha Retiro ---
     if is_retiro:
-        fecha = pd.to_datetime(cab["fecha_retiro"]) #--
-        ws["E46"] = fecha.day
-        ws["F46"] = fecha.month
-        ws["G46"] = fecha.year % 100
+        try:
+            fecha = pd.to_datetime(cab["fecha_retiro"]) #--
+            ws["E46"] = fecha.day
+            ws["F46"] = fecha.month
+            ws["G46"] = fecha.year % 100
+        except:
+            pass
 
     # Guardar en memoria
     output = io.BytesIO()
