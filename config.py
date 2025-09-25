@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 
-VERSION = "1.0.42"
+VERSION = "1.0.43"
 TITULO_APP = f"🧢 SISTEMA CAPPELLO vs {VERSION}"
 # TITULO_APP = "INTRODUCCION A PYTHON"
 FOOTER_APP = "Sistema Capello® - Powered by Python and Streamlit - Telegram: @Bairesman - 2025"

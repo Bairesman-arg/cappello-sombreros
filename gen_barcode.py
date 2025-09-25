@@ -250,7 +250,8 @@ def gen_barcode():
                     min_value=1,
                     max_value=4000,
                     value=60,
-                    step=1
+                    step=1,
+                    help="Si selecciona menos de 60, quedarán etiquetas en blanco. Mayor cantidad imprime más páginas."
                 )
 
             if st.button("Generar PDF para Imprimir",):

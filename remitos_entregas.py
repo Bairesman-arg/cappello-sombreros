@@ -12,12 +12,14 @@ from gen_remito import gen_remito
 st.set_page_config(layout="wide")
 
 def clear_item_inputs():
-    """Reinicia los valores de los inputs de items y fuerza el reinicio del selectbox."""
+    """Reinicia los valores de los inputs de items sin cambiar la clave del selectbox."""
     st.session_state.entregados_input = 1
     st.session_state.observaciones_item_input = ""
-    st.session_state.selectbox_key = str(time.time())
     st.session_state.articulo_precargado = None
     st.session_state.precio_real_input = 0.0
+    st.session_state.precio_original_articulo = 0.0  # ← AGREGAR
+    # st.session_state.selectbox_key = str(time.time())
+    # NO cambiar selectbox_key para evitar reset del selectbox
 
 def new_remito():
     """Reinicia completamente el formulario para un nuevo remito."""
@@ -36,6 +38,8 @@ def new_remito():
     st.session_state.is_saved = False
     st.session_state.success_shown = False
     st.session_state.cliente_selected_display = None
+    # Limpiar artículo precargado pero mantener clave del selectbox
+    st.session_state.articulo_precargado = None
     clear_item_inputs()
 
 def calculate_consignacion(items_df):
@@ -71,7 +75,6 @@ def remitos_entregas():
         "entregados_input": 1,
         "observaciones_item_input": "",
         "precio_real_input": 0.0,
-        "selectbox_key": "initial_key",
         "cabecera_key": "initial_cabecera",
         "should_clear_items": False,
         "should_reset_all": False,
@@ -80,7 +83,9 @@ def remitos_entregas():
         "is_saved": False,
         "success_shown": False,
         "cliente_selected_display": None,
-        "precios_actualizados": False
+        "precios_actualizados": False,
+        "articulo_precargado": None,
+        "precio_original_articulo": 0.0
     }
 
     for key, default in default_values.items():
@@ -194,31 +199,52 @@ def remitos_entregas():
     articulo_sel_full = st.selectbox(
         articulo_label,
         options=[SENTINEL] + articulo_options_full,
-        key=st.session_state.selectbox_key,
-        disabled=st.session_state.is_form_disabled
+        key="articulo_selectbox_fixed",  # ← CLAVE FIJA en lugar de st.session_state.selectbox_key
+        disabled=st.session_state.is_form_disabled,
+        help="Seleccione un nuevo artículo o uno existente en la grilla para modificar o eliminar."
     )
 
     # Manejar selección de artículo
     articulo_sel = SENTINEL
     if articulo_sel_full != SENTINEL and not st.session_state.is_form_disabled:
         articulo_sel = articulo_sel_full.split(" - ")[0]
-        # Pre-cargar datos si el artículo ya existe en la grilla
-        if ('articulo_precargado' not in st.session_state or
-            st.session_state.articulo_precargado != articulo_sel):
+        
+        # Verificar si necesitamos precargar datos O si el precio está en cero (siempre recargar si es cero)
+        should_preload = (
+            'articulo_precargado' not in st.session_state or 
+            st.session_state.articulo_precargado != articulo_sel or
+            st.session_state.precio_real_input <= 0  # ← SIEMPRE recargar si precio es cero o menor
+        )
+        
+        if should_preload:
             st.session_state.articulo_precargado = articulo_sel
-
+            
+            # Pre-cargar datos si el artículo ya existe en la grilla
             if articulo_sel in st.session_state.items_data['Articulo'].values:
                 row = st.session_state.items_data.loc[
                     st.session_state.items_data['Articulo'] == articulo_sel
                 ].iloc[0]
                 st.session_state.entregados_input = int(row['Entregados'])
                 st.session_state.observaciones_item_input = row['Observaciones']
-                st.session_state.precio_real_input = row['Precio Real']
+                st.session_state.precio_real_input = float(row['Precio Real'])
+                st.session_state.precio_original_articulo = float(row['Precio Real'])
             else:
-                matching_articulo = st.session_state.articulos_df.loc[st.session_state.articulos_df['nro_articulo'] == articulo_sel].iloc[0]
-                st.session_state.precio_real_input = matching_articulo['precio_real']
-                st.session_state.entregados_input = 1
-                st.session_state.observaciones_item_input = ""
+                # Cargar precio desde maestro de artículos
+                matching_articulo = st.session_state.articulos_df.loc[
+                    st.session_state.articulos_df['nro_articulo'] == articulo_sel
+                ]
+                if not matching_articulo.empty:
+                    articulo_data = matching_articulo.iloc[0]
+                    precio_maestro = float(articulo_data['precio_real'])
+                    st.session_state.precio_real_input = precio_maestro
+                    st.session_state.precio_original_articulo = precio_maestro
+                    st.session_state.entregados_input = 1
+                    st.session_state.observaciones_item_input = ""
+                else:
+                    st.error(f"Error: No se encontró el artículo {articulo_sel}")
+                    st.session_state.precio_real_input = 0.0
+                    st.session_state.precio_original_articulo = 0.0
+            
             st.rerun()
 
     # Inputs de item
@@ -286,6 +312,8 @@ def remitos_entregas():
     if add_clicked:
         if st.session_state.entregados_input < 1:
             st.error("La cantidad entregada debe ser 1 o mayor.")
+        elif st.session_state.precio_real_input <= 0:
+            st.error("El precio real debe ser mayor a cero. Vuelva a seleccionar el artículo.")
         else:
             articulo_info = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == articulo_sel].iloc[0]
             new_item = {

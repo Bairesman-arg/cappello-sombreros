@@ -216,7 +216,7 @@ def articulos_crud():
         st.text_input(
             "Número de Artículo",
             key="nro_articulo_final",
-            help="Ingrese un código de artículo existente para editar\n\no uno nuevo para agregar.",
+            help="Ingrese un código de artículo existente para editar\no uno nuevo para agregar.",
             on_change=update_form_with_article_data
         )
 
