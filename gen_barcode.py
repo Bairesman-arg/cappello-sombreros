@@ -85,11 +85,11 @@ def generate_barcode(code_to_generate: str):
 def generate_pdf_labels(code: str, price: str, quantity: int):
     """
     Genera un archivo PDF con etiquetas de código de barras,
-    ahora optimizado para 5 columnas y 12 filas en una hoja A4.
+    optimizado para 6 columnas y 13 filas en una hoja A4.
+    Espacios reducidos para maximizar el aprovechamiento de la hoja.
 
     El contenido de cada etiqueta está centrado verticalmente para
-    lograr una apariencia más equilibrada. La grilla divisoria
-    cubre toda el área de las etiquetas correctamente.
+    lograr una apariencia más equilibrada.
     """
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -97,35 +97,35 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
     # Dimensiones de la hoja A4 en milímetros
     page_width, page_height = A4
 
-    # Configuración de la grilla de etiquetas
-    num_cols = 5
-    num_rows = 12
+    # Configuración de la grilla de etiquetas - CAMBIADO a 6x13
+    num_cols = 6
+    num_rows = 13
     
-    # Dimensiones de la etiqueta para ajustarse a 5x12
-    label_width = 38.4 * mm
-    label_height = 23.0 * mm
+    # Dimensiones de la etiqueta ajustadas para 6x13 - REDUCIDAS
+    label_width = 32.0 * mm  # Reducido de 38.4mm
+    label_height = 18.5 * mm  # Reducido de 23.0mm
     
-    col_spacing = 2.0 * mm
+    col_spacing = 1.5 * mm  # Reducido de 2.0mm
+    row_spacing = 1.0 * mm  # Nuevo espaciado entre filas
     
     # Calcular márgenes de la página para centrar la grilla
     total_block_width = (num_cols * label_width) + ((num_cols - 1) * col_spacing)
-    total_block_height = num_rows * label_height
+    total_block_height = (num_rows * label_height) + ((num_rows - 1) * row_spacing)
     
     margin_left = (page_width - total_block_width) / 2
     margin_top = (page_height - total_block_height) / 2
 
-    # Dimensiones y espaciado de los elementos de la etiqueta
-    barcode_height = 6 * mm
-    code_font_size = 6
-    price_font_size = 16
+    # Dimensiones y espaciado de los elementos de la etiqueta - AJUSTADOS
+    barcode_height = 5 * mm  # Reducido de 6mm
+    code_font_size = 5  # Reducido de 6
+    price_font_size = 14  # Reducido de 16
 
-    space_between_barcode_and_code = 0.5 * mm
-    space_between_code_and_price = 0.5 * mm
+    space_between_barcode_and_code = 0.3 * mm  # Reducido de 0.5mm
+    space_between_code_and_price = 0.3 * mm  # Reducido de 0.5mm
 
-    # Altura vertical de los elementos para calcular el centrado
-    # Se usa una aproximación de la altura del texto
-    text_height_code = 2.1 * mm
-    text_height_price = 5.6 * mm
+    # Altura vertical de los elementos para calcular el centrado - AJUSTADAS
+    text_height_code = 1.8 * mm  # Reducido
+    text_height_price = 4.9 * mm  # Reducido
     
     total_element_height = (barcode_height + text_height_code + text_height_price +
                             space_between_barcode_and_code + space_between_code_and_price)
@@ -144,10 +144,12 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
     def draw_grid():
         # Dibuja las líneas horizontales
         for i in range(num_rows + 1):
-            y_line = y_end_grid - i * label_height
+            y_line = y_end_grid - i * (label_height + row_spacing)
+            if i == num_rows:  # Última línea
+                y_line = y_start_grid
             c.line(x_start_grid, y_line, x_end_grid, y_line)
 
-        # Dibuja las líneas verticales, corregido para la última línea
+        # Dibuja las líneas verticales
         for i in range(num_cols + 1):
             if i < num_cols:
                 x_line = x_start_grid + i * (label_width + col_spacing)
@@ -169,13 +171,13 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
         row = (i % (num_rows * num_cols)) // num_cols
         
         x_base = margin_left + col * (label_width + col_spacing)
-        y_base = page_height - margin_top - (row + 1) * label_height
+        y_base = page_height - margin_top - (row + 1) * (label_height + row_spacing) + row_spacing
 
         # Posiciona los elementos verticalmente, centrándolos en la etiqueta
         y_barcode = y_base + label_height - vertical_margin - barcode_height
         
         # 1. Dibujar el código de barras
-        barcode_obj = code128.Code128(code, barWidth=0.25*mm, barHeight=barcode_height)
+        barcode_obj = code128.Code128(code, barWidth=0.22*mm, barHeight=barcode_height)  # Barras más delgadas
         barcode_width = barcode_obj.width
         x_centered_barcode = x_base + (label_width - barcode_width) / 2
         
@@ -246,12 +248,12 @@ def gen_barcode():
 
             with col2:
                 quantity = st.number_input(
-                    "Cantidad de etiquetas (60 p/página en A4):",
+                    "Cantidad de etiquetas (78 p/página en A4):",
                     min_value=1,
                     max_value=4000,
-                    value=60,
+                    value=78,
                     step=1,
-                    help="Si selecciona menos de 60, quedarán etiquetas en blanco. Mayor cantidad imprime más páginas."
+                    help="Si selecciona menos de 78, quedarán etiquetas en blanco. Mayor cantidad imprime más páginas."
                 )
 
             if st.button("Generar PDF para Imprimir",):
