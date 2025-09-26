@@ -141,23 +141,37 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
     x_end_grid = margin_left + total_block_width
     y_end_grid = page_height - margin_top
 
-    def draw_grid():
-        # Dibuja las líneas horizontales
-        for i in range(num_rows + 1):
-            y_line = y_end_grid - i * (label_height + row_spacing)
-            if i == num_rows:  # Última línea
-                y_line = y_start_grid
-            c.line(x_start_grid, y_line, x_end_grid, y_line)
-
-        # Dibuja las líneas verticales
+    def draw_cutting_guides():
+        """
+        Dibuja pequeñas marcas de referencia en los bordes para guiar el corte
+        en lugar de líneas completas que atraviesen toda la hoja.
+        """
+        mark_length = 3 * mm  # Longitud de las marcas de corte
+        
+        # Marcas horizontales (para cortes verticales) - en bordes superior e inferior
         for i in range(num_cols + 1):
             if i < num_cols:
-                x_line = x_start_grid + i * (label_width + col_spacing)
+                x_mark = x_start_grid + i * (label_width + col_spacing)
             else:
-                x_line = x_start_grid + total_block_width
-            c.line(x_line, y_start_grid, x_line, y_end_grid)
+                x_mark = x_start_grid + total_block_width
+            
+            # Marca superior
+            c.line(x_mark, y_end_grid, x_mark, y_end_grid + mark_length)
+            # Marca inferior  
+            c.line(x_mark, y_start_grid, x_mark, y_start_grid - mark_length)
+        
+        # Marcas verticales (para cortes horizontales) - en bordes izquierdo y derecho
+        for i in range(num_rows + 1):
+            y_mark = y_end_grid - i * (label_height + row_spacing)
+            if i == num_rows:  # Última línea
+                y_mark = y_start_grid
+            
+            # Marca izquierda
+            c.line(x_start_grid - mark_length, y_mark, x_start_grid, y_mark)
+            # Marca derecha
+            c.line(x_end_grid, y_mark, x_end_grid + mark_length, y_mark)
 
-    draw_grid()
+    draw_cutting_guides()
 
     for i in range(quantity):
         # Avanza a la siguiente página si se alcanza el límite
@@ -165,7 +179,7 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
             c.showPage()
             c.setFont("Helvetica", code_font_size)
             c.setLineWidth(0.25)
-            draw_grid()
+            draw_cutting_guides()
         
         col = (i % (num_rows * num_cols)) % num_cols
         row = (i % (num_rows * num_cols)) // num_cols
