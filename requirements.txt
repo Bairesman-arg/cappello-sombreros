@@ -1,7 +1,7 @@
 openpyxl
 python-barcode
 Pillow
-streamlit
+streamlit>=1.31.0
 reportlab
 streamlit_option_menu
 sqlalchemy
