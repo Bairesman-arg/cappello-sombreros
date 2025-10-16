@@ -232,12 +232,13 @@ def gen_barcode():
     codes_data = load_codes_from_db()
     
     if codes_data:
+
         selected_item = st.selectbox(
-            " Artículos disponibles:", 
-            options=codes_data, 
-            index=None, 
-            # placeholder="Selecciona un código...",
-            format_func=lambda item: f"{item['code']} - {item['description']}"
+            "Artículos disponibles:", 
+            options=codes_data,
+            placeholder="Selecciona un código...",
+            format_func=lambda item: f"{item['code']} - {item['description']}",
+            index=0  # Selecciona el primer elemento por defecto
         )
 
         if selected_item:
