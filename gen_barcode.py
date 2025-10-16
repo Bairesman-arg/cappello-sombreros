@@ -236,7 +236,7 @@ def gen_barcode():
             " Artículos disponibles:", 
             options=codes_data, 
             index=None, 
-            placeholder="Selecciona un código...",
+            # placeholder="Selecciona un código...",
             format_func=lambda item: f"{item['code']} - {item['description']}"
         )
 
