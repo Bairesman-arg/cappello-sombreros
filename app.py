@@ -51,9 +51,10 @@ def app():
         if 'currentpage' not in st.session_state:
             st.session_state.currentpage = 'Codigos de Barra'  # valor por defecto
 
+        # MENÚ PRINCIPAL - Incluye Backup
         mainmenu = option_menu(menu_title=None,
-                              options=["Codigos de Barra", "Clientes", "Articulos", "Remitos"],
-                              icons=["file", "pencil", "pencil", "truck"],
+                              options=["Codigos de Barra", "Clientes", "Articulos", "Remitos", "Backup"],
+                              icons=["file", "pencil", "pencil", "truck", "shield-check"],
                               menu_icon="app-indicator",
                               default_index=0)
 
@@ -62,7 +63,8 @@ def app():
             # Limpiar variables en session_state que puedan contener datos viejos
             claves_a_limpiar = [
                 'clientes_df',
-                'articulos_df'
+                'articulos_df',
+                'backup_manager'  # NUEVO: Limpiar manager de backup
             ]
             for clave in claves_a_limpiar:
                 if clave in st.session_state:
@@ -72,7 +74,7 @@ def app():
             st.session_state.currentpage = mainmenu
             st.rerun()
 
-        # Definición de submenús y lógica por página...
+        # Submenús
         if mainmenu == "Remitos":
             submenu = option_menu(menu_title="Remitos",
                                       options=["Entregas", "Devoluciones y Ventas", "Anulaciones"],
@@ -84,6 +86,14 @@ def app():
                                       options=["ABM Articulos", "Cargar Novedades"],
                                       icons=["file-earmark-plus", "file-earmark-plus"],
                                       menu_icon="folder", default_index=0, orientation="vertical")
+        
+        elif mainmenu == "Backup":
+            submenu = option_menu(menu_title="Backup",
+                                      options=["Crear Backup", "Restaurar Backup"],
+                                      icons=["download", "upload"],
+                                      menu_icon="shield-check", 
+                                      default_index=0, 
+                                      orientation="vertical")
         else:
             submenu = None
 
@@ -107,6 +117,15 @@ def app():
             remitos_ventas()
         elif submenu == "Anulaciones":
             remitos_anulaciones()
+    
+    # NUEVA SECCIÓN PARA BACKUP - Importación lazy
+    elif mainmenu == "Backup":
+        if submenu == "Crear Backup":
+            from backup_simple import simple_backup
+            simple_backup()
+        if submenu == "Restaurar Backup":
+            from restore_backup import restore_backup
+            restore_backup()
 
 if __name__ == '__main__':
     app()
