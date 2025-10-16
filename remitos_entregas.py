@@ -9,7 +9,7 @@ from models import (
 )
 from gen_remito import gen_remito
 
-st.set_page_config(layout="wide")
+# st.set_page_config(layout="wide")
 
 def clear_item_inputs():
     """Reinicia los valores de los inputs de items sin cambiar la clave del selectbox."""
