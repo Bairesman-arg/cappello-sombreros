@@ -222,9 +222,9 @@ def generate_pdf_labels(code: str, price: str, quantity: int):
 # --- Lógica de las páginas de la aplicación ---
 def gen_barcode():
 
-    #st.set_page_config(
-    #    layout="wide"
-    #)
+    st.set_page_config(
+        layout="wide"
+    )
 
     st.title(config.TITULO_APP)
     st.header(f"Generador de Códigos de Barras")
