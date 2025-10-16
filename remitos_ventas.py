@@ -9,7 +9,7 @@ import time
 import config
 
 def remitos_ventas():
-    # st.set_page_config(layout="wide")
+    st.set_page_config(layout="wide")
     st.title(config.TITULO_APP)
     st.header("Remitos - Devoluciones y Ventas")
 
