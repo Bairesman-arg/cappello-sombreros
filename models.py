@@ -142,26 +142,29 @@ def get_clients_and_articles():
 def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, porc_dto, items_df):
     fecha_actual = datetime.now()
     
+    # Asegurar tipos nativos de Python para evitar errores de adaptación de psycopg2 con tipos de pandas/numpy
+    cliente_id = int(cliente_id)
+    porc_dto_val = float(porc_dto) if pd.notna(porc_dto) else None
+    
     with engine.begin() as conn:
         # Buscar el remito existente por cliente y fechas
         query = text("""
             SELECT id FROM remitos WHERE cliente_id = :cliente_id AND fecha_entrega = :fecha_entrega AND fecha_retiro IS NULL
         """)
-        # Convertir cliente_id a int
         remito_id_result = conn.execute(query, {
-            "cliente_id": int(cliente_id),
+            "cliente_id": cliente_id,
             "fecha_entrega": fecha_entrega,
         }).scalar()
 
         if remito_id_result:
-            remito_id = remito_id_result
+            remito_id = int(remito_id_result)
             conn.execute(text("""
                 UPDATE remitos
                 SET fecha_mod = :now, porc_dto = :porc_dto, observaciones = :obs
                 WHERE id = :rid
             """), {
                 "now": fecha_actual,
-                "porc_dto": porc_dto,
+                "porc_dto": porc_dto_val,
                 "obs": observaciones_cabecera,
                 "rid": remito_id
             })
@@ -176,22 +179,24 @@ def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera,
 
             # Se itera sobre el DataFrame para guardar cada item y actualizar precios.
             for _, row in items_df.iterrows():
-                # Convertir a int el ID del artículo
+                # Convertir a int/float los tipos de datos
                 articulo_id = int(row['id_articulo'])
+                precio_real_val = float(row['Precio Real'])
+                entregados_val = int(row['Entregados'])
                 
                 # Obtener el precio_real actual de la base de datos
                 current_price_result = conn.execute(text("SELECT precio_real FROM articulos WHERE id = :aid"), 
-                                                    {"aid": articulo_id}).scalar()
+                                                     {"aid": articulo_id}).scalar()
                 
                 # Se compara el precio del DataFrame editado con el de la base de datos.
-                if current_price_result != row['Precio Real']:
+                if current_price_result != precio_real_val:
                     # Si el precio es diferente, se actualiza en la tabla de articulos.
                     conn.execute(text("""
                         UPDATE articulos
                         SET precio_real = :new_price, fecha_mod = :now
                         WHERE id = :aid
                     """), {
-                        "new_price": row['Precio Real'],
+                        "new_price": precio_real_val,
                         "now": fecha_actual,
                         "aid": articulo_id
                     })
@@ -204,9 +209,9 @@ def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera,
                 """), {
                     "remito_id": remito_id,
                     "articulo_id": articulo_id,
-                    "entregados": int(row["Entregados"]), # Convertir a int
+                    "entregados": entregados_val,
                     "observaciones": row["Observaciones"] if pd.notna(row["Observaciones"]) else None,
-                    "precio_real": row["Precio Real"] # ¡SE GUARDA EL PRECIO DEL ÍTEM!
+                    "precio_real": precio_real_val
                 })
             
             return remito_id, precios_modificados
@@ -218,27 +223,30 @@ def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera,
                 VALUES (:cid, :porc_dto, :fecha_entrega, :obs, :now, :now)
                 RETURNING id
             """), {
-                "cid": int(cliente_id), # Convertir a int
-                "porc_dto": porc_dto,
+                "cid": cliente_id,
+                "porc_dto": porc_dto_val,
                 "fecha_entrega": fecha_entrega,
                 "obs": observaciones_cabecera,
                 "now": fecha_actual
             })
-            remito_id = result.scalar()
+            remito_id = int(result.scalar())
 
             precios_modificados = False
             for _, row in items_df.iterrows():
-                articulo_id = int(row['id_articulo']) # Convertir a int
-                current_price_result = conn.execute(text("SELECT precio_real FROM articulos WHERE id = :aid"), 
-                                                    {"aid": articulo_id}).scalar()
+                articulo_id = int(row['id_articulo'])
+                precio_real_val = float(row['Precio Real'])
+                entregados_val = int(row['Entregados'])
                 
-                if current_price_result != row['Precio Real']:
+                current_price_result = conn.execute(text("SELECT precio_real FROM articulos WHERE id = :aid"), 
+                                                     {"aid": articulo_id}).scalar()
+                
+                if current_price_result != precio_real_val:
                     conn.execute(text("""
                         UPDATE articulos
                         SET precio_real = :new_price, fecha_mod = :now
                         WHERE id = :aid
                     """), {
-                        "new_price": row['Precio Real'],
+                        "new_price": precio_real_val,
                         "now": fecha_actual,
                         "aid": articulo_id
                     })
@@ -250,9 +258,9 @@ def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera,
                 """), {
                     "remito_id": remito_id,
                     "articulo_id": articulo_id,
-                    "entregados": int(row["Entregados"]), # Convertir a int
+                    "entregados": entregados_val,
                     "observaciones": row["Observaciones"] if pd.notna(row["Observaciones"]) else None,
-                    "precio_real": row["Precio Real"] # ¡SE GUARDA EL PRECIO DEL ÍTEM!
+                    "precio_real": precio_real_val
                 })
             
             return remito_id, precios_modificados
@@ -353,7 +361,7 @@ def update_or_insert_articulos_from_excel(df):
     for index, row in df.iterrows():
         nro = str(row['nro_articulo']).strip().upper()
         desc = row['descripcion']
-        precio = row['precio_real']
+        precio = float(row['precio_real']) if pd.notna(row['precio_real']) else 0.0
         
         if nro in existing_nros:
             articles_to_update.append({
@@ -500,6 +508,7 @@ def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df
     """
     Actualiza la cabecera y los items de un remito existente.
     """
+    remito_id = int(remito_id)
     with engine.begin() as conn:
         # Actualizar la cabecera del remito
         conn.execute(text("""
@@ -527,6 +536,7 @@ def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df
             """), {"nro": row["nro_articulo"]}).scalar()
             
             if articulo_result:
+                articulo_id = int(articulo_result)
                 # Preparar valores, manejando posibles valores NaN o None
                 devueltos = int(row.get("devueltos", 0)) if pd.notna(row.get("devueltos")) else 0
                 observaciones = str(row.get("observaciones", "")) if pd.notna(row.get("observaciones")) else ""
@@ -541,7 +551,7 @@ def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df
                     "obs": observaciones if observaciones.strip() else None,
                     "devueltos": devueltos,
                     "rid": remito_id,
-                    "aid": articulo_result
+                    "aid": articulo_id
                 })
             else:
                 # Log o manejar el caso donde no se encuentra el artículo
