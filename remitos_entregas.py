@@ -131,14 +131,23 @@ def remitos_entregas():
 
     # Manejar selección del cliente de forma directa
     if cliente_selection:
-        selected_razon_social = cliente_selection.split("  |  Boca:")[0].strip()
-        matching_client = st.session_state.clientes_df.loc[st.session_state.clientes_df['razon_social'] == selected_razon_social]
-        st.session_state.porc_dto = matching_client["porc_dto"].values[0]
+        matching_client = st.session_state.clientes_df.loc[st.session_state.clientes_df['display_name'] == cliente_selection]
+        if matching_client.empty:
+            # Fallback a buscar por razón social si por alguna extraña razón no coincide display_name
+            selected_razon_social = cliente_selection.split("  |  Boca:")[0].strip()
+            matching_client = st.session_state.clientes_df.loc[
+                st.session_state.clientes_df['razon_social'].str.strip() == selected_razon_social
+            ]
 
         if not matching_client.empty:
             client_data = matching_client.iloc[0]
+            st.session_state.porc_dto = client_data["porc_dto"]
             st.session_state.cabecera_data['cliente_id'] = client_data['id']
             st.session_state.cliente_selected_display = cliente_selection
+        else:
+            st.session_state.porc_dto = None
+            st.session_state.cabecera_data['cliente_id'] = None
+            st.session_state.cliente_selected_display = None
     elif st.session_state.get('cliente_selected_display') and not cliente_selection:
         st.session_state.cabecera_data['cliente_id'] = None
         st.session_state.cliente_selected_display = None
@@ -166,7 +175,7 @@ def remitos_entregas():
     with col3:
         # Mostrar descuento como métrica (no editable)
         porc_dto = st.session_state.porc_dto
-        dto_display = f"{porc_dto}%" if porc_dto is not None else "Seleccione Cliente"
+        dto_display = f"{porc_dto}%" if pd.notna(porc_dto) else "Seleccione Cliente"
         st.metric(
             label="Descuento ( dato privado )",
             value=dto_display
