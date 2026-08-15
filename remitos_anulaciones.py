@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import date, datetime
 from models import get_remito_completo, delete_remito
@@ -10,6 +11,25 @@ def remitos_anulaciones():
     st.set_page_config(layout="wide")
     st.title(config.TITULO_APP)
     st.header("Anulación de Remitos")
+
+    st.markdown("""
+    <style>
+    div.element-container:has(iframe[height="0"]),
+    div[data-testid="stCustomComponentV1"]:has(iframe[height="0"]),
+    div[data-testid="stElementContainer"]:has(iframe[height="0"]) {
+        display: none !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+    iframe[height="0"] {
+        display: none !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # Inicializar variables de estado
     if "show_confirm_modal" not in st.session_state:
@@ -26,7 +46,7 @@ def remitos_anulaciones():
     # Manejo de flags de rerun
     if st.session_state.should_reset_all:
         # Limpiar session state
-        keys_to_clear = ["remito_activo"] + [k for k in st.session_state.keys() if k.startswith("remito_")]
+        keys_to_clear = ["remito_activo_anul"] + [k for k in st.session_state.keys() if k.startswith("remito_anul_")]
         for k in keys_to_clear:
             st.session_state.pop(k, None)
         st.session_state.should_reset_all = False
@@ -34,6 +54,7 @@ def remitos_anulaciones():
         st.session_state.is_form_disabled = False
         st.session_state.remito_deleted = False
         st.session_state.delete_success_shown = False
+        st.session_state.input_remito_anul = 1
         st.rerun()
 
     # Control de estado del formulario
@@ -44,32 +65,38 @@ def remitos_anulaciones():
 
     # Función para cargar remito automáticamente
     def cargar_remito_auto():
-        if "input_remito" in st.session_state:
-            remito_id = st.session_state["input_remito"]
+        if "input_remito_anul" in st.session_state:
+            remito_id = st.session_state["input_remito_anul"]
             datos = get_remito_completo(remito_id)
             if datos:
                 items = datos["cabecera"]
                 items_df = datos["items"].copy()
                                 
-                st.session_state[f"remito_{remito_id}_cab"] = items
-                st.session_state[f"remito_{remito_id}_items"] = items_df
-                st.session_state["remito_activo"] = remito_id
+                st.session_state[f"remito_anul_{remito_id}_cab"] = items
+                st.session_state[f"remito_anul_{remito_id}_items"] = items_df
+                st.session_state["remito_activo_anul"] = remito_id
                 st.session_state["carga_exitosa"] = True
                 st.session_state.remito_deleted = False
                 st.session_state.delete_success_shown = False
             else:
                 st.session_state["carga_exitosa"] = False
 
+    # Sincronizar input con el remito activo si existen datos cargados
+    if "remito_activo_anul" in st.session_state and st.session_state["remito_activo_anul"] is not None:
+        st.session_state["input_remito_anul"] = st.session_state["remito_activo_anul"]
+
     with col1:
         remito_id = st.number_input(
             label="Número de Remito a Anular:",
             min_value=1, 
             step=1, 
-            key="input_remito",
+            key="input_remito_anul",
             on_change=cargar_remito_auto,
             help="Ingrese un Remito existente para anular.",
             disabled=st.session_state.is_form_disabled or st.session_state.remito_deleted
         )
+
+
 
     # Mostrar mensajes después de cualquier carga
     if "carga_exitosa" in st.session_state:
@@ -80,10 +107,10 @@ def remitos_anulaciones():
         del st.session_state["carga_exitosa"]
 
     # --- Mostrar formulario si hay remito activo ---
-    if "remito_activo" in st.session_state and not st.session_state.remito_deleted:
-        remito_id = st.session_state["remito_activo"]
-        cab_key = f"remito_{remito_id}_cab"
-        items_key = f"remito_{remito_id}_items"
+    if "remito_activo_anul" in st.session_state and not st.session_state.remito_deleted:
+        remito_id = st.session_state["remito_activo_anul"]
+        cab_key = f"remito_anul_{remito_id}_cab"
+        items_key = f"remito_anul_{remito_id}_items"
         
         if cab_key in st.session_state and items_key in st.session_state:
             cab = st.session_state[cab_key]
@@ -206,7 +233,7 @@ def remitos_anulaciones():
 
     # === MODAL DE CONFIRMACIÓN ===
     if st.session_state.show_confirm_modal:
-        st.warning(f"¿Está COMPLETAMENTE SEGURO que desea anular el Remito #{st.session_state['remito_activo']}?")
+        st.warning(f"¿Está COMPLETAMENTE SEGURO que desea anular el Remito #{st.session_state['remito_activo_anul']}?")
         col_confirm, col_cancel = st.columns(2, gap="small")
 
         with col_confirm:
@@ -214,7 +241,7 @@ def remitos_anulaciones():
                         type="primary",
                         width="stretch"):
                 # Ejecutar la eliminación
-                remito_id = st.session_state["remito_activo"]
+                remito_id = st.session_state["remito_activo_anul"]
                 success = delete_remito(remito_id)
                 
                 if success:
@@ -238,6 +265,39 @@ def remitos_anulaciones():
 
     # Footer
     st.markdown(f"`{config.FOOTER_APP}`")
+
+    if "remito_activo_anul" not in st.session_state:
+        components.html("""
+        <script>
+            (function() {
+                function focusRemitoInput() {
+                    try {
+                        const doc = window.parent.document;
+                        const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                        const remitoWidget = numInputs.find(w => (w.innerText || '').includes('Remito')) || numInputs[0];
+                        if (remitoWidget) {
+                            const input = remitoWidget.querySelector('input');
+                            if (input) {
+                                input.focus();
+                                try {
+                                    input.select();
+                                } catch(e) {
+                                    try {
+                                        const origType = input.type;
+                                        input.type = 'text';
+                                        input.setSelectionRange(0, input.value.length);
+                                        input.type = origType;
+                                    } catch(e2) {}
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+                setTimeout(focusRemitoInput, 150);
+                setTimeout(focusRemitoInput, 350);
+            })();
+        </script>
+        """, height=0, width=0)
 
 if __name__ == "__main__":
     remitos_anulaciones()

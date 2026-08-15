@@ -6,6 +6,7 @@ estándar (Code128) del elemento seleccionado y crear un PDF de etiquetas,
 con una estructura de navegación en el sidebar.
 """
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import barcode
 from barcode.writer import ImageWriter
@@ -56,10 +57,11 @@ def load_codes_from_db():
         st.error(f"Ocurrió un error al leer la base de datos: {e}")
         return []
 
+@st.cache_data
 def generate_barcode(code_to_generate: str):
     """
     Genera un código de barras (Code128) a partir de un string de texto y retorna
-    la imagen en un formato que Streamlit puede mostrar.
+    los bytes de la imagen PNG que Streamlit muestra sin problemas de caché.
     """
     try:
         code128_obj = barcode.get("code128", code_to_generate, writer=ImageWriter())
@@ -72,10 +74,7 @@ def generate_barcode(code_to_generate: str):
             "write_text": False
         }
         code128_obj.write(buffer, options)
-        buffer.seek(0)
-        
-        pil_image = Image.open(buffer)
-        return pil_image
+        return buffer.getvalue()
             
     except Exception as e:
         st.error(f"Error al generar el código de barras: {e}")
@@ -233,23 +232,33 @@ def gen_barcode():
     
     if codes_data:
 
+        def on_article_change():
+            st.session_state.focus_target_gb = "precio"
+
         selected_item = st.selectbox(
             "Artículos disponibles:", 
             options=codes_data,
             placeholder="Selecciona un código...",
             format_func=lambda item: f"{item['code']} - {item['description']}",
-            index=0  # Selecciona el primer elemento por defecto
+            index=0,  # Selecciona el primer elemento por defecto
+            key="barcode_article_selectbox",
+            on_change=on_article_change
         )
 
         if selected_item:
             selected_code_only = selected_item['code']
+
+            # Seguridad adicional: si el código cambió respecto al último visto, marcar foco en 'precio'
+            if st.session_state.get('last_seen_code_gb') != selected_code_only:
+                st.session_state.last_seen_code_gb = selected_code_only
+                st.session_state.focus_target_gb = "precio"
             
             col1, col2 = st.columns([2, 2],gap="small")
             with col1:
                 st.subheader("Código de barras:")
                 barcode_image = generate_barcode(selected_code_only)
                 if barcode_image:
-                    st.image(barcode_image, caption=f"Código: {selected_code_only}", width='stretch')
+                    st.image(barcode_image, caption=f"Código: {selected_code_only}", use_container_width=True)
             
             st.subheader("Opciones de Impresión")
             
@@ -286,3 +295,152 @@ def gen_barcode():
         st.info("No se encontraron códigos o hubo un error al leer la base de datos.")
 
     st.markdown(f"`{config.FOOTER_APP}`")
+
+    target_to_focus = st.session_state.get('focus_target_gb', '')
+    if target_to_focus:
+        st.session_state.focus_target_gb = ''
+
+    components.html(f"""
+    <script>
+        (function() {{
+            const doc = window.parent.document;
+
+            if (window.parent._selectHandlerGB) {{
+                doc.removeEventListener('focusin', window.parent._selectHandlerGB, true);
+                doc.removeEventListener('click', window.parent._selectHandlerGB, true);
+            }}
+
+            function doSelect(el) {{
+                if (!el || doc.activeElement !== el) return;
+                try {{
+                    if (typeof el.select === 'function') {{
+                        el.select();
+                    }}
+                }} catch(e1) {{}}
+                try {{
+                    if (typeof el.setSelectionRange === 'function' && el.value !== undefined) {{
+                        el.setSelectionRange(0, el.value.length);
+                    }}
+                }} catch(e2) {{}}
+            }}
+
+            window.parent._selectHandlerGB = function(e) {{
+                const target = e.target;
+                if (!target) return;
+                const tag = (target.tagName || '').toUpperCase();
+                if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
+
+                function runPasses() {{
+                    doSelect(target);
+                    setTimeout(function() {{ doSelect(target); }}, 10);
+                    setTimeout(function() {{ doSelect(target); }}, 40);
+                    setTimeout(function() {{ doSelect(target); }}, 120);
+                }}
+
+                runPasses();
+            }};
+
+            doc.addEventListener('focusin', window.parent._selectHandlerGB, true);
+            doc.addEventListener('click', window.parent._selectHandlerGB, true);
+
+            function getFormSequence() {{
+                const sequence = [];
+                const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
+                if (selectboxes.length > 0) {{
+                    const artBox = selectboxes[selectboxes.length - 1];
+                    const input = artBox.querySelector('input');
+                    if (input) sequence.push({{ container: artBox, input: input }});
+                }}
+                const textInputs = Array.from(doc.querySelectorAll('div[data-testid="stTextInput"]'));
+                textInputs.forEach(w => {{
+                    const input = w.querySelector('input');
+                    if (input) sequence.push({{ container: w, input: input }});
+                }});
+                const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                numInputs.forEach(w => {{
+                    const input = w.querySelector('input');
+                    if (input) sequence.push({{ container: w, input: input }});
+                }});
+                const buttons = Array.from(doc.querySelectorAll('button'));
+                const pdfBtn = buttons.find(b => (b.textContent || '').includes('Generar PDF') && !b.disabled);
+                if (pdfBtn) sequence.push({{ container: pdfBtn, input: pdfBtn, isButton: true }});
+                
+                return sequence;
+            }}
+
+            if (!doc._enterAsTabAttachedGB) {{
+                doc._enterAsTabAttachedGB = true;
+                doc.addEventListener('keydown', function(e) {{
+                    if (e.key === 'Enter' || e.keyCode === 13) {{
+                        const activeEl = doc.activeElement;
+                        if (!activeEl) return;
+                        if (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'TEXTAREA') {{
+                            return;
+                        }}
+                        if (activeEl.closest && activeEl.closest('div[data-testid="stSelectbox"]')) {{
+                            return;
+                        }}
+                        const sequence = getFormSequence();
+                        const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
+                        if (currIdx > -1 && currIdx < sequence.length - 1) {{
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const nextItem = sequence[currIdx + 1];
+                            nextItem.input.focus();
+                            if (nextItem.input.select) nextItem.input.select();
+                        }}
+                    }}
+                }}, true);
+            }}
+        }})();
+
+        const targetType = '{target_to_focus}';
+        if (targetType === 'precio') {{
+            function findPrecioInput(doc) {{
+                const inputs = Array.from(doc.querySelectorAll('input'));
+                let found = inputs.find(i => {{
+                    const label = (i.getAttribute('aria-label') || '').toLowerCase();
+                    return label.includes('precio');
+                }});
+                if (found) return found;
+
+                const containers = Array.from(doc.querySelectorAll('div[data-testid="stTextInput"], div[data-testid="stElementContainer"], div.element-container'));
+                const precioContainer = containers.find(c => (c.textContent || '').includes('Precio'));
+                if (precioContainer) {{
+                    found = precioContainer.querySelector('input');
+                    if (found) return found;
+                }}
+
+                if (inputs.length > 1) {{
+                    return inputs[1];
+                }}
+                return null;
+            }}
+
+            function executeJumpToPrecio() {{
+                try {{
+                    const doc = window.parent.document;
+                    const precioInput = findPrecioInput(doc);
+                    if (precioInput) {{
+                        if (window.parent && typeof window.parent.focus === 'function') {{
+                            try {{ window.parent.focus(); }} catch(e0) {{}}
+                        }}
+                        if (doc.activeElement && doc.activeElement !== precioInput && typeof doc.activeElement.blur === 'function') {{
+                            try {{ doc.activeElement.blur(); }} catch(e1) {{}}
+                        }}
+                        precioInput.focus();
+                        try {{ precioInput.click(); }} catch(e2) {{}}
+                        if (typeof precioInput.select === 'function') {{
+                            try {{ precioInput.select(); }} catch(e3) {{}}
+                        }}
+                    }}
+                }} catch(e) {{}}
+            }}
+
+            // Ejecutar con temporizador de 500ms, 1000ms (1 segundo) y 1500ms
+            setTimeout(executeJumpToPrecio, 500);
+            setTimeout(executeJumpToPrecio, 1000);
+            setTimeout(executeJumpToPrecio, 1500);
+        }}
+    </script>
+    """, height=0, width=0)

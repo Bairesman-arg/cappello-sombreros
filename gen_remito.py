@@ -68,3 +68,132 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     output.seek(0)
 
     return output
+
+def get_desktop_path() -> str:
+    """Obtiene la ruta real del Escritorio de Windows, soportando redirecciones (como OneDrive)."""
+    try:
+        import ctypes
+        buf = ctypes.create_unicode_buffer(260)
+        # CSIDL_DESKTOP = 0
+        if ctypes.windll.shell32.SHGetFolderPathW(None, 0, None, 0, buf) == 0 and buf.value:
+            return buf.value
+    except Exception:
+        pass
+
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders')
+        val, _ = winreg.QueryValueEx(key, 'Desktop')
+        expanded = os.path.expandvars(val)
+        if expanded and os.path.exists(expanded):
+            return expanded
+    except Exception:
+        pass
+
+    user_profile = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+    try:
+        for subfolder in os.listdir(user_profile):
+            if "OneDrive" in subfolder:
+                onedrive_desktop = os.path.join(user_profile, subfolder, "Desktop")
+                if os.path.exists(onedrive_desktop):
+                    return onedrive_desktop
+    except Exception:
+        pass
+
+    return os.path.join(user_profile, "Desktop")
+
+def is_local_app() -> bool:
+    """Detecta si la aplicación se está ejecutando en un entorno Windows local con interfaz gráfica."""
+    if os.name != 'nt':
+        return False
+    try:
+        import tkinter as tk
+        root = tk.Tk()
+        root.withdraw()
+        root.destroy()
+        return True
+    except Exception:
+        return False
+
+def select_folder_native(default_dir=None) -> str:
+    """Abre un cuadro de diálogo emergente de Windows para seleccionar carpeta."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        
+        initial_dir = default_dir or os.path.join(get_desktop_path(), "REMITOS CONSIGNACION")
+        if not os.path.exists(initial_dir):
+            initial_dir = get_desktop_path()
+
+        folder = filedialog.askdirectory(
+            title="Seleccione la carpeta donde guardar el Remito",
+            initialdir=initial_dir
+        )
+        root.destroy()
+        return folder if folder else None
+    except Exception:
+        return None
+
+def get_remito_filename(remito_id: int, is_retiro: bool = False) -> str:
+    """
+    Construye el nombre del archivo Excel en formato:
+    Remito_<boca:04d>_<remito_id>.xlsx
+    o bien
+    Remito_<boca:04d>_<remito_id>_Ventas.xlsx (si es retiro)
+    """
+    boca_str = "0000"
+    try:
+        data = get_remito_completo(remito_id)
+        if data and "cabecera" in data:
+            boca_val = data["cabecera"].get("boca")
+            if boca_val is not None and str(boca_val).strip() != "":
+                boca_str = f"{int(boca_val):04d}"
+    except Exception:
+        pass
+
+    if is_retiro:
+        return f"Remito_{boca_str}_{remito_id}_Ventas.xlsx"
+    else:
+        return f"Remito_{boca_str}_{remito_id}.xlsx"
+
+def save_remito_to_custom_folder(remito_id: int, folder_path: str, is_retiro: bool = False) -> str:
+    """Guarda el remito Excel en la carpeta indicada por el usuario."""
+    os.makedirs(folder_path, exist_ok=True)
+    file_name = get_remito_filename(remito_id, is_retiro=is_retiro)
+    target_path = os.path.join(folder_path, file_name)
+    excel_buffer = gen_remito(remito_id, is_retiro=is_retiro)
+    with open(target_path, "wb") as f:
+        f.write(excel_buffer.getvalue())
+
+    return target_path
+
+def save_remito_to_desktop(remito_id: int, is_retiro: bool = False) -> str:
+    """
+    Genera el remito Excel y lo guarda directamente en Escritorio/REMITOS CONSIGNACION.
+    Crea la carpeta si no existe.
+    Devuelve la ruta absoluta del archivo guardado.
+    """
+    desktop_path = get_desktop_path()
+    target_dir = os.path.join(desktop_path, "REMITOS CONSIGNACION")
+    return save_remito_to_custom_folder(remito_id, target_dir, is_retiro=is_retiro)
+
+def process_generate_remito(remito_id: int, is_retiro: bool = False, default_dir: str = None):
+    """
+    Función híbrida para procesar la generación del remito.
+    Si se ejecuta localmente, abre el diálogo para elegir carpeta y guarda el archivo.
+    Devuelve (guardado_exitoso: bool, mensaje_o_ruta: str, carpeta_seleccionada: str)
+    """
+    if is_local_app():
+        selected_folder = select_folder_native(default_dir=default_dir)
+        if selected_folder:
+            saved_path = save_remito_to_custom_folder(remito_id, selected_folder, is_retiro=is_retiro)
+            return True, saved_path, selected_folder
+        else:
+            return False, "Operación cancelada por el usuario.", None
+    else:
+        target_path = save_remito_to_desktop(remito_id, is_retiro=is_retiro)
+        return True, target_path, None

@@ -77,7 +77,7 @@ def app():
         # Submenús
         if mainmenu == "Remitos":
             submenu = option_menu(menu_title="Remitos",
-                                      options=["Entregas", "Devoluciones y Ventas", "Anulaciones"],
+                                      options=["Entregas", "Recepciones", "Anulaciones"],
                                       icons=["file-earmark-plus", "file-earmark-plus", "file-earmark-plus"],
                                       menu_icon="folder", default_index=0, orientation="vertical")
 
@@ -113,7 +113,7 @@ def app():
     elif mainmenu == "Remitos":
         if submenu == "Entregas":
             rem_ent.remitos_entregas()
-        elif submenu == "Devoluciones y Ventas":
+        elif submenu == "Recepciones":
             remitos_ventas()
         elif submenu == "Anulaciones":
             remitos_anulaciones()

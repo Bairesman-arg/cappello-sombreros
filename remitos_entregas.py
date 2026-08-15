@@ -1,25 +1,25 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
-from datetime import timedelta
+from datetime import timedelta, datetime, date
 import time
 import config
 from models import (
     get_clients_and_articles,
     save_remito
 )
-from gen_remito import gen_remito
+from gen_remito import gen_remito, process_generate_remito, is_local_app, get_remito_filename
 
 st.set_page_config(layout="wide")
 
 def clear_item_inputs():
-    """Reinicia los valores de los inputs de items sin cambiar la clave del selectbox."""
+    """Reinicia los valores de los inputs de items manteniendo la clave del selectbox."""
     st.session_state.entregados_input = 1
     st.session_state.observaciones_item_input = ""
     st.session_state.articulo_precargado = None
     st.session_state.precio_real_input = 0.0
-    st.session_state.precio_original_articulo = 0.0  # ← AGREGAR
-    # st.session_state.selectbox_key = str(time.time())
-    # NO cambiar selectbox_key para evitar reset del selectbox
+    st.session_state.precio_original_articulo = 0.0
+    st.session_state.articulo_selectbox_fixed = None
 
 def new_remito():
     """Reinicia completamente el formulario para un nuevo remito."""
@@ -37,6 +37,7 @@ def new_remito():
     st.session_state.cabecera_key = str(time.time())
     st.session_state.is_saved = False
     st.session_state.success_shown = False
+    st.session_state.remito_generado_msg = None
     st.session_state.cliente_selected_display = None
     # Limpiar artículo precargado pero mantener clave del selectbox
     st.session_state.articulo_precargado = None
@@ -47,6 +48,26 @@ def calculate_consignacion(items_df):
     if 'Entregados' in items_df.columns:
         return int(items_df['Entregados'].sum())
     return 0
+
+def calculate_total_facturar(items_df, cliente_id, porc_dto):
+    """
+    Calcula el total a facturar considerando el descuento del cliente.
+    Si cliente_id es None, retorna 'Ingrese el Cliente'.
+    """
+    if cliente_id is None:
+        return "Ingrese el Cliente"
+
+    if items_df.empty or 'Precio Real' not in items_df.columns or 'Entregados' not in items_df.columns:
+        return "$0.00"
+
+    precios = pd.to_numeric(items_df['Precio Real'], errors='coerce').fillna(0)
+    entregados = pd.to_numeric(items_df['Entregados'], errors='coerce').fillna(0)
+    
+    dto_val = float(porc_dto) if (porc_dto is not None and pd.notna(porc_dto)) else 0.0
+    factor = 1.0 - (dto_val / 100.0)
+
+    total = (precios * entregados).sum() * factor
+    return f"${float(total):.2f}"
 
 def remitos_entregas():
     st.title(config.TITULO_APP)
@@ -85,7 +106,8 @@ def remitos_entregas():
         "cliente_selected_display": None,
         "precios_actualizados": False,
         "articulo_precargado": None,
-        "precio_original_articulo": 0.0
+        "precio_original_articulo": 0.0,
+        "focus_articulo": False
     }
 
     for key, default in default_values.items():
@@ -96,7 +118,7 @@ def remitos_entregas():
     if st.session_state.should_clear_items:
         clear_item_inputs()
         st.session_state.should_clear_items = False
-        st.rerun()
+        st.session_state.focus_target = "articulo"
 
     if st.session_state.should_reset_all:
         new_remito()
@@ -119,11 +141,18 @@ def remitos_entregas():
         axis=1
     )
 
+    options_list = st.session_state.clientes_df['display_name'].tolist()
+    
+    # Determinar el index predeterminado si ya hay un cliente seleccionado guardado
+    default_client_index = None
+    if st.session_state.get('cliente_selected_display') in options_list:
+        default_client_index = options_list.index(st.session_state.cliente_selected_display)
+
     # Selectbox de cliente - simple y directo
     cliente_selection = st.selectbox(
         "Cliente:",
-        options=st.session_state.clientes_df['display_name'].tolist(),
-        index=None,
+        options=options_list,
+        index=default_client_index,
         placeholder="Seleccione un cliente...",
         key=f"cliente_selection_input_{st.session_state.cabecera_key}",
         disabled=st.session_state.is_form_disabled
@@ -144,20 +173,15 @@ def remitos_entregas():
             st.session_state.porc_dto = client_data["porc_dto"]
             st.session_state.cabecera_data['cliente_id'] = client_data['id']
             st.session_state.cliente_selected_display = cliente_selection
-        else:
-            st.session_state.porc_dto = None
-            st.session_state.cabecera_data['cliente_id'] = None
-            st.session_state.cliente_selected_display = None
-    elif st.session_state.get('cliente_selected_display') and not cliente_selection:
-        st.session_state.cabecera_data['cliente_id'] = None
-        st.session_state.cliente_selected_display = None
 
     # Campos de fecha y descuento
     col1, col2, col3 = st.columns(3, gap="small")
 
     with col1:
+        val_fecha = st.session_state.cabecera_data.get('fecha_entrega') or datetime.now()
         fecha_entrega = st.date_input(
             "Fecha de Entrega",
+            value=val_fecha,
             format="DD/MM/YYYY",
             key=f"fecha_entrega_{st.session_state.cabecera_key}",
             disabled=st.session_state.is_form_disabled
@@ -207,15 +231,17 @@ def remitos_entregas():
     # Selectbox de artículo
     articulo_sel_full = st.selectbox(
         articulo_label,
-        options=[SENTINEL] + articulo_options_full,
-        key="articulo_selectbox_fixed",  # ← CLAVE FIJA en lugar de st.session_state.selectbox_key
+        options=articulo_options_full,
+        index=None,
+        placeholder="Seleccione un artículo...",
+        key="articulo_selectbox_fixed",
         disabled=st.session_state.is_form_disabled,
         help="Seleccione un nuevo artículo o uno existente en la grilla para modificar o eliminar."
     )
 
     # Manejar selección de artículo
-    articulo_sel = SENTINEL
-    if articulo_sel_full != SENTINEL and not st.session_state.is_form_disabled:
+    articulo_sel = None
+    if articulo_sel_full and not st.session_state.is_form_disabled:
         articulo_sel = articulo_sel_full.split(" - ")[0]
         
         # Verificar si necesitamos precargar datos O si el precio está en cero (siempre recargar si es cero)
@@ -254,6 +280,7 @@ def remitos_entregas():
                     st.session_state.precio_real_input = 0.0
                     st.session_state.precio_original_articulo = 0.0
             
+            st.session_state.focus_target = "entregados"
             st.rerun()
 
     # Inputs de item
@@ -284,36 +311,33 @@ def remitos_entregas():
             disabled=st.session_state.is_form_disabled
         )
 
-    # with st.sidebar:
-    #    st.write(st.session_state.precio_real_input)
-
     # Botones de acción para items
-    articulo_existe = (articulo_sel != SENTINEL and
+    articulo_existe = (articulo_sel is not None and
                       articulo_sel in st.session_state.items_data['Articulo'].values)
 
     c1, c2, c3 = st.columns(3, gap="small")
 
     with c1:
         add_clicked = st.button(
-            "Agregar Item",
+            "Agregar Item ➕",
             use_container_width=True,
-            disabled=(articulo_sel == SENTINEL or articulo_existe or
+            disabled=(articulo_sel is None or articulo_existe or
                      st.session_state.is_form_disabled)
         )
 
     with c2:
         mod_clicked = st.button(
-            "Modificar Item",
+            "Modificar Item ✍️",
             use_container_width=True,
-            disabled=(articulo_sel == SENTINEL or not articulo_existe or
+            disabled=(articulo_sel is None or not articulo_existe or
                      st.session_state.is_form_disabled)
         )
 
     with c3:
         del_clicked = st.button(
-            "Eliminar Item",
+            "Eliminar Item 🗑️",
             use_container_width=True,
-            disabled=(articulo_sel == SENTINEL or not articulo_existe or
+            disabled=(articulo_sel is None or not articulo_existe or
                      st.session_state.is_form_disabled)
         )
 
@@ -393,9 +417,27 @@ def remitos_entregas():
     else:
         st.info("Sin items cargados todavía.")
 
-    # Mostrar total de consignación
-    st.metric("Consignación (Total Entregados)",
-              value=calculate_consignacion(st.session_state.items_data))
+    # Mostrar métricas de consignación y total a facturar a la misma altura (Total a Facturar bien marginado a la derecha)
+    col_m1, col_m2 = st.columns(2, gap="small")
+    with col_m1:
+        st.metric(
+            "Consignación (Total Entregados)",
+            value=calculate_consignacion(st.session_state.items_data)
+        )
+    with col_m2:
+        cliente_id = st.session_state.cabecera_data.get('cliente_id')
+        porc_dto = st.session_state.get('porc_dto')
+        total_facturar_val = calculate_total_facturar(st.session_state.items_data, cliente_id, porc_dto)
+        
+        val_color = "#ff4b4b" if total_facturar_val == "Ingrese el Cliente" else "var(--text-color, #ffffff)"
+        val_font_size = "1.5rem" if total_facturar_val == "Ingrese el Cliente" else "2rem"
+
+        st.markdown(f"""
+        <div style="text-align: right; width: 100%;">
+            <div style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.7); font-weight: 400; margin-bottom: 4px;">Total a Facturar</div>
+            <div style="font-size: {val_font_size}; font-weight: 600; color: {val_color}; line-height: 1.2;">{total_facturar_val}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     # === BOTONES PRINCIPALES ===
     st.header("Acciones del Remito")
@@ -441,22 +483,38 @@ def remitos_entregas():
                 st.session_state.show_confirm_modal = True
                 st.rerun()
 
-    # Botón Generar/Descargar Remito
+    # Botón Generar Remito
     with col_buttons[2]:
         if is_remito_saved:
-            excel_buffer = gen_remito(st.session_state.remito_id, is_retiro=False)
-            st.download_button(
-                label=f"Descargar Remito #{st.session_state.remito_id}",
-                use_container_width=True,
-                data=excel_buffer,
-                file_name=f"Remito_{st.session_state.remito_id}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            if is_local_app():
+                if st.button(f"Generar Remito en Excel #{st.session_state.remito_id}", use_container_width=True, key=f"btn_gen_{st.session_state.remito_id}"):
+                    last_folder = st.session_state.get('last_used_folder')
+                    success, msg, chosen_folder = process_generate_remito(st.session_state.remito_id, is_retiro=False, default_dir=last_folder)
+                    if success:
+                        st.session_state.last_used_folder = chosen_folder
+                        st.session_state.remito_generado_msg = f"📁 Remito #{st.session_state.remito_id} guardado exitosamente en:\n`{msg}`"
+                        st.toast(f"Remito #{st.session_state.remito_id} guardado con éxito", icon="📁")
+                    else:
+                        st.session_state.remito_generado_msg = None
+                        st.info(msg)
+                    st.rerun()
+            else:
+                excel_buffer = gen_remito(st.session_state.remito_id, is_retiro=False)
+                st.download_button(
+                    label=f"Generar Remito en Excel #{st.session_state.remito_id}",
+                    use_container_width=True,
+                    data=excel_buffer,
+                    file_name=get_remito_filename(st.session_state.remito_id, is_retiro=False),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
         else:
-            st.button("Generar Remito", use_container_width=True, disabled=True)
+            st.button("Generar Remito en Excel", use_container_width=True, disabled=True)
 
     if say_error:
         st.error("Por favor, seleccione un cliente y agregue al menos un item.")
+
+    if st.session_state.get('remito_generado_msg'):
+        st.success(st.session_state.remito_generado_msg)
 
     # Mensaje de éxito fuera de las columnas (ocupa todo el ancho)
     if st.session_state.get('remito_id') and not st.session_state.get('success_shown', False):
@@ -474,18 +532,205 @@ def remitos_entregas():
         col_confirm, col_cancel, _ = st.columns([1, 1, 1], gap="small")
 
         with col_confirm:
-            if st.button("Sí, continuar",width="stretch"):
+            if st.button("Sí, continuar ⚠️", width="stretch"):
                 st.session_state.show_confirm_modal = False
                 st.session_state.should_reset_all = True
                 st.rerun()
 
         with col_cancel:
-            if st.button("Cancelar",width="stretch"):
+            if st.button("Cancelar ❌", width="stretch"):
                 st.session_state.show_confirm_modal = False
                 st.rerun()
 
+    # CSS para ocultar el contenedor de componentes de altura cero y eliminar huecos negros
+    st.markdown("""
+    <style>
+    div.element-container:has(iframe[height="0"]),
+    div[data-testid="stCustomComponentV1"]:has(iframe[height="0"]),
+    div[data-testid="stElementContainer"]:has(iframe[height="0"]) {
+        display: none !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+    iframe[height="0"] {
+        display: none !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Footer
     st.markdown(f"`{config.FOOTER_APP}`")
+
+    # Componente para navegación con Enter como Tab y foco automático
+    target_to_focus = st.session_state.get('focus_target', '')
+    if target_to_focus:
+        st.session_state.focus_target = ''
+
+    components.html(f"""
+    <script>
+        (function() {{
+            try {{
+                const doc = window.parent.document;
+
+                // Desvincular escuchadores anteriores si existían
+                if (window.parent._selectHandlerEntregas) {{
+                    doc.removeEventListener('focusin', window.parent._selectHandlerEntregas, true);
+                    doc.removeEventListener('click', window.parent._selectHandlerEntregas, true);
+                }}
+                if (window.parent._selectionChangeHandlerEntregas) {{
+                    doc.removeEventListener('selectionchange', window.parent._selectionChangeHandlerEntregas, true);
+                }}
+
+                function doSelect(el) {{
+                    if (!el || doc.activeElement !== el) return;
+                    try {{
+                        if (typeof el.select === 'function') {{
+                            el.select();
+                        }}
+                    }} catch(e1) {{}}
+                    try {{
+                        if (typeof el.setSelectionRange === 'function' && el.value !== undefined) {{
+                            el.setSelectionRange(0, el.value.length);
+                        }}
+                    }} catch(e2) {{}}
+                    try {{
+                        doc.execCommand('selectAll', false, null);
+                    }} catch(e3) {{}}
+                }}
+
+                window.parent._selectHandlerEntregas = function(e) {{
+                    const target = e.target;
+                    if (!target) return;
+                    const tag = (target.tagName || '').toUpperCase();
+                    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
+
+                    if (target.dataset.autoSelecting === 'true') return;
+                    target.dataset.autoSelecting = 'true';
+
+                    function runPasses() {{
+                        doSelect(target);
+                        setTimeout(function() {{ doSelect(target); }}, 10);
+                        setTimeout(function() {{ doSelect(target); }}, 40);
+                        setTimeout(function() {{ doSelect(target); }}, 120);
+                        setTimeout(function() {{ doSelect(target); }}, 250);
+                        setTimeout(function() {{ doSelect(target); }}, 450);
+                        requestAnimationFrame(function() {{ doSelect(target); }});
+                    }}
+
+                    runPasses();
+                }};
+
+                window.parent._selectionChangeHandlerEntregas = function() {{
+                    const active = doc.activeElement;
+                    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {{
+                        if (active.dataset.autoSelecting === 'true') {{
+                            if (active.selectionStart !== 0 || active.selectionEnd !== active.value.length) {{
+                                doSelect(active);
+                            }}
+                        }}
+                    }}
+                }};
+
+                doc.addEventListener('focusin', window.parent._selectHandlerEntregas, true);
+                doc.addEventListener('click', window.parent._selectHandlerEntregas, true);
+                doc.addEventListener('selectionchange', window.parent._selectionChangeHandlerEntregas, true);
+
+                doc.addEventListener('keydown', function(e) {{
+                    if (e.target && e.target.dataset) {{
+                        delete e.target.dataset.autoSelecting;
+                    }}
+                }}, true);
+
+                doc.addEventListener('focusout', function(e) {{
+                    if (e.target && e.target.dataset) {{
+                        delete e.target.dataset.autoSelecting;
+                    }}
+                }}, true);
+                
+                function getFormSequence() {{
+                    const sequence = [];
+                    const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
+                    if (selectboxes.length > 0) {{
+                        const artBox = selectboxes[selectboxes.length - 1];
+                        const input = artBox.querySelector('input');
+                        if (input) sequence.push({{ container: artBox, input: input }});
+                    }}
+                    const numInputs = doc.querySelectorAll('div[data-testid="stNumberInput"]');
+                    numInputs.forEach(w => {{
+                        const input = w.querySelector('input');
+                        if (input) sequence.push({{ container: w, input: input }});
+                    }});
+                    const textInputs = doc.querySelectorAll('div[data-testid="stTextInput"]');
+                    textInputs.forEach(w => {{
+                        const input = w.querySelector('input');
+                        if (input) sequence.push({{ container: w, input: input }});
+                    }});
+                    const buttons = Array.from(doc.querySelectorAll('button'));
+                    const addBtn = buttons.find(b => (b.textContent || '').includes('Agregar Item') && !b.disabled);
+                    if (addBtn) sequence.push({{ container: addBtn, input: addBtn, isButton: true }});
+                    
+                    return sequence;
+                }}
+
+                if (!doc._enterAsTabAttached) {{
+                    doc._enterAsTabAttached = true;
+                    doc.addEventListener('keydown', function(e) {{
+                        if (e.key === 'Enter' || e.keyCode === 13) {{
+                            const activeEl = doc.activeElement;
+                            if (!activeEl) return;
+                            if (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'TEXTAREA') {{
+                                return;
+                            }}
+                            if (activeEl.closest && activeEl.closest('div[data-testid="stSelectbox"]')) {{
+                                return;
+                            }}
+                            const sequence = getFormSequence();
+                            const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
+                            if (currIdx > -1 && currIdx < sequence.length - 1) {{
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const nextItem = sequence[currIdx + 1];
+                                nextItem.input.focus();
+                                if (nextItem.input.select) nextItem.input.select();
+                            }}
+                        }}
+                    }}, true);
+                }}
+            }} catch(e) {{}}
+        }})();
+
+        const targetType = '{target_to_focus}';
+        if (targetType) {{
+            setTimeout(function() {{
+                try {{
+                    const doc = window.parent.document;
+                    if (targetType === 'entregados') {{
+                        const numInputs = doc.querySelectorAll('div[data-testid="stNumberInput"] input');
+                        if (numInputs.length > 0) {{
+                            const target = numInputs[0];
+                            target.focus();
+                            if (target.select) target.select();
+                        }}
+                    }} else if (targetType === 'articulo') {{
+                        const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
+                        if (selectboxes.length > 0) {{
+                            const targetBox = selectboxes[selectboxes.length - 1];
+                            const input = targetBox.querySelector('input') || targetBox.querySelector('div[role="combobox"]');
+                            if (input) {{
+                                input.focus();
+                                input.click();
+                            }}
+                        }}
+                    }}
+                }} catch(e) {{}}
+            }}, 300);
+        }}
+    </script>
+    """, height=0, width=0)
 
 if __name__ == "__main__":
     remitos_entregas()

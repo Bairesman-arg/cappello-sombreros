@@ -136,7 +136,7 @@ def get_clients_and_articles():
     with engine.begin() as conn:
         clientes_df = pd.read_sql("SELECT id, razon_social, boca, porc_dto FROM clientes", conn)
         # Se agrega la columna 'precio_real' a la consulta.
-        articulos_df = pd.read_sql("SELECT id, nro_articulo, descripcion, precio_publico, precio_real FROM articulos", conn)
+        articulos_df = pd.read_sql("SELECT id, nro_articulo, descripcion, precio_publico, precio_real, COALESCE(costo, 0) AS costo FROM articulos", conn)
     return clientes_df, articulos_df
 
 def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera, porc_dto, items_df):
@@ -406,9 +406,9 @@ def get_remito_completo(remito_id: int):
     with engine.begin() as conn:
         # --- Cabecera ---
         cabecera = conn.execute(text("""
-            SELECT r.id AS remito_id, r.fecha_entrega, r.fecha_retiro, r.observaciones,
+            SELECT r.id AS remito_id, r.cliente_id, r.fecha_entrega, r.fecha_retiro, r.observaciones,
                    c.razon_social, c.boca, c.direccion, c.localidad, c.telefono,
-                   COALESCE(c.porc_dto, 1) AS porc_dto
+                   COALESCE(r.porc_dto, c.porc_dto, 0) AS porc_dto
             FROM remitos r
             JOIN clientes c ON r.cliente_id = c.id
             WHERE r.id = :rid
@@ -419,8 +419,9 @@ def get_remito_completo(remito_id: int):
 
         # --- Items ---
         items = pd.read_sql(text("""
-            SELECT a.nro_articulo, a.descripcion, a.precio_real, 
-                    ri.entregados, ri.devueltos, ri.observaciones_item observaciones
+            SELECT a.id AS id_articulo, a.nro_articulo, a.descripcion, COALESCE(ri.precio_real_item, a.precio_real, 0) AS precio_real, 
+                    COALESCE(a.costo, 0) AS costo,
+                    ri.entregados, ri.devueltos, COALESCE(ri.observaciones_item, '') AS observaciones
             FROM remito_items ri
             JOIN articulos a ON ri.articulo_id = a.id
             WHERE ri.remito_id = :rid
@@ -430,6 +431,69 @@ def get_remito_completo(remito_id: int):
         "cabecera": dict(cabecera),
         "items": items
     }
+
+def update_remito_completo(remito_id, fecha_retiro, observaciones_cabecera, items_df):
+    """
+    Actualiza completamente la cabecera (fecha_retiro, observaciones) y los items de un remito existente.
+    """
+    remito_id = int(remito_id)
+    fecha_actual = datetime.now()
+    precios_modificados = False
+
+    with engine.begin() as conn:
+        # Actualizar la cabecera del remito
+        conn.execute(text("""
+            UPDATE remitos
+            SET fecha_retiro = :fr, observaciones = :obs, fecha_mod = :now
+            WHERE id = :rid
+        """), {
+            "fr": fecha_retiro,
+            "obs": observaciones_cabecera,
+            "now": fecha_actual,
+            "rid": remito_id
+        })
+
+        # Eliminar items antiguos del remito
+        conn.execute(text("""
+            DELETE FROM remito_items WHERE remito_id = :rid
+        """), {"rid": remito_id})
+
+        # Reinsertar los nuevos items y actualizar precios maestros si sufrieron modificaciones
+        for _, row in items_df.iterrows():
+            articulo_id = int(row['id_articulo'])
+            precio_real_val = float(row['Precio Real'])
+            entregados_val = int(row['Entregados'])
+            observaciones_val = str(row['Observaciones']).strip() if pd.notna(row['Observaciones']) and str(row['Observaciones']).strip() and str(row['Observaciones']).strip().lower() != 'none' else None
+
+            # Verificar si el precio en el maestro cambió
+            current_price_result = conn.execute(text("SELECT precio_real FROM articulos WHERE id = :aid"), 
+                                                 {"aid": articulo_id}).scalar()
+            
+            if current_price_result is not None and float(current_price_result) != precio_real_val:
+                conn.execute(text("""
+                    UPDATE articulos
+                    SET precio_real = :new_price, fecha_mod = :now
+                    WHERE id = :aid
+                """), {
+                    "new_price": precio_real_val,
+                    "now": fecha_actual,
+                    "aid": articulo_id
+                })
+                precios_modificados = True
+
+            # Insertar item
+            conn.execute(text("""
+                INSERT INTO remito_items (remito_id, articulo_id, entregados, observaciones_item, precio_real_item)
+                VALUES (:rid, :aid, :entregados, :obs, :precio_real)
+            """), {
+                "rid": remito_id,
+                "aid": articulo_id,
+                "entregados": entregados_val,
+                "obs": observaciones_val,
+                "precio_real": precio_real_val
+            })
+
+    return remito_id, precios_modificados
 
 def get_all_clientes():
     """Devuelve un DataFrame de Pandas con todos los clientes, incluyendo el nombre del vendedor."""
@@ -528,34 +592,41 @@ def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df
         # except Exception:
         #    pass  # La columna ya existe o hay otro error que podemos ignorar
 
-        # Actualizar los ítems del remito
+        # Eliminar items antiguos de este remito para sincronizar altas y bajas
+        conn.execute(text("""
+            DELETE FROM remito_items WHERE remito_id = :rid
+        """), {"rid": remito_id})
+
+        # Reinsertar los ítems actualizados del remito
         for _, row in items_df.iterrows():
-            # Obtener el ID del artículo
-            articulo_result = conn.execute(text("""
-                SELECT id FROM articulos WHERE nro_articulo = :nro
-            """), {"nro": row["nro_articulo"]}).scalar()
+            articulo_id = None
+            if "id_articulo" in row and pd.notna(row["id_articulo"]):
+                articulo_id = int(row["id_articulo"])
+            else:
+                articulo_result = conn.execute(text("""
+                    SELECT id FROM articulos WHERE nro_articulo = :nro
+                """), {"nro": str(row["nro_articulo"])}).scalar()
+                if articulo_result:
+                    articulo_id = int(articulo_result)
             
-            if articulo_result:
-                articulo_id = int(articulo_result)
-                # Preparar valores, manejando posibles valores NaN o None
+            if articulo_id:
                 devueltos = int(row.get("devueltos", 0)) if pd.notna(row.get("devueltos")) else 0
-                observaciones = str(row.get("observaciones", "")) if pd.notna(row.get("observaciones")) else ""
+                entregados = int(row.get("entregados", 0)) if pd.notna(row.get("entregados")) else 0
+                precio_real = float(row.get("precio_real", 0)) if pd.notna(row.get("precio_real")) else 0.0
+                obs_raw = row.get("observaciones", "")
+                observaciones = str(obs_raw).strip() if (pd.notna(obs_raw) and str(obs_raw).strip() and str(obs_raw).strip().lower() != "none") else None
                 
                 conn.execute(text("""
-                    UPDATE remito_items
-                    SET observaciones_item = :obs, 
-                        devueltos = :devueltos
-                    WHERE remito_id = :rid
-                    AND articulo_id = :aid
+                    INSERT INTO remito_items (remito_id, articulo_id, entregados, devueltos, observaciones_item, precio_real_item)
+                    VALUES (:rid, :aid, :entregados, :devueltos, :obs, :precio_real)
                 """), {
-                    "obs": observaciones if observaciones.strip() else None,
-                    "devueltos": devueltos,
                     "rid": remito_id,
-                    "aid": articulo_id
+                    "aid": articulo_id,
+                    "entregados": entregados,
+                    "devueltos": devueltos,
+                    "obs": observaciones,
+                    "precio_real": precio_real
                 })
-            else:
-                # Log o manejar el caso donde no se encuentra el artículo
-                print(f"Warning: Artículo {row['nro_articulo']} no encontrado en la base de datos")
 
 
 def delete_remito(remito_id):
