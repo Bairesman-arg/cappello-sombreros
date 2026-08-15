@@ -11,6 +11,7 @@ import remitos_entregas as rem_ent
 import sys, os, time, traceback
 import datetime
 import models
+import config
 
 # This will create the engine
 # TITLE -- coding utf-8 --
@@ -38,9 +39,16 @@ def app():
         st.markdown(
             """
             <style>
-                [data-testid=stSidebar] {
+                [data-testid="stSidebar"] {
                     min-width: 300px;
                     max-width: 300px;
+                }
+                [data-testid="stSidebarUserContent"],
+                section[data-testid="stSidebar"] > div {
+                    padding-top: 1rem !important;
+                }
+                [data-testid="stSidebarHeader"] {
+                    display: none !important;
                 }
             </style>
             """,
@@ -51,12 +59,12 @@ def app():
         if 'currentpage' not in st.session_state:
             st.session_state.currentpage = 'Codigos de Barra'  # valor por defecto
 
-        # MENÚ PRINCIPAL - Incluye Backup
+        # MENÚ PRINCIPAL - Incluye Rubros, Informes y Backup
         mainmenu = option_menu(menu_title=None,
-                              options=["Codigos de Barra", "Clientes", "Articulos", "Remitos", "Backup"],
-                              icons=["file", "pencil", "pencil", "truck", "shield-check"],
-                              menu_icon="app-indicator",
-                              default_index=0)
+                               options=["Codigos de Barra", "Clientes", "Articulos", "Rubros", "Remitos", "Informes", "Backup"],
+                               icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
+                               menu_icon="app-indicator",
+                               default_index=0)
 
         # Detectar cambio de página
         if mainmenu != st.session_state.currentpage:
@@ -110,6 +118,10 @@ def app():
         elif submenu == "ABM Articulos":
             articulos_crud()
 
+    elif mainmenu == "Rubros":
+        from rubros import rubros_crud
+        rubros_crud()
+
     elif mainmenu == "Remitos":
         if submenu == "Entregas":
             rem_ent.remitos_entregas()
@@ -117,6 +129,11 @@ def app():
             remitos_ventas()
         elif submenu == "Anulaciones":
             remitos_anulaciones()
+
+    elif mainmenu == "Informes":
+        st.title(config.TITULO_APP)
+        st.header("Informes")
+        st.info("Módulo de Informes en desarrollo.")
     
     # NUEVA SECCIÓN PARA BACKUP - Importación lazy
     elif mainmenu == "Backup":

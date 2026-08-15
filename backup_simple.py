@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Módulo de backup simple
+Módulo de backup simple con persistencia de resultado y diálogo nativo de guardado
 """
 
 import streamlit as st
@@ -13,12 +13,52 @@ import io
 import sqlite3
 import config
 
+def get_desktop_path() -> str:
+    """Obtiene la ruta del Escritorio del usuario."""
+    return os.path.join(os.path.expanduser("~"), "Desktop")
+
+def is_local_app() -> bool:
+    """Verifica si la aplicación corre localmente."""
+    return not os.environ.get("STREAMLIT_SERVER_TARGET") and (
+        os.path.exists("C:\\") or os.name == 'nt' or 'localhost' in os.environ.get("SERVER_NAME", "")
+    )
+
+def select_backup_folder(default_dir: str = None) -> str:
+    """Abre un diálogo nativo (Tkinter) para seleccionar la carpeta donde guardar el backup."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        
+        initial_dir = default_dir or os.path.join(get_desktop_path(), "BACKUPS CAPELLO")
+        if not os.path.exists(initial_dir):
+            initial_dir = get_desktop_path()
+
+        folder = filedialog.askdirectory(
+            title="Seleccione la carpeta donde guardar el Backup (.zip)",
+            initialdir=initial_dir
+        )
+        root.destroy()
+        return folder if folder else None
+    except Exception as e:
+        st.error(f"Error abriendo el explorador de archivos: {e}")
+        return None
+
 def simple_backup_page():
     """Página simple de backup sin complicaciones"""
     
     st.title(config.TITULO_APP)
     st.header("💾 Backup de Base de Datos")
     
+    # Inicialización de estado persistente
+    if "backup_result" not in st.session_state:
+        st.session_state.backup_result = None
+    if "backup_saved_msg" not in st.session_state:
+        st.session_state.backup_saved_msg = None
+
     # Verificación inicial simple
     try:
         db_url = st.secrets["DB_URL"]
@@ -35,20 +75,97 @@ DB_URL = "postgresql://usuario:contraseña@servidor:puerto/basededatos"
     
     with col1:
         st.markdown("### 📊 Estado de la Base de Datos")
-        verificar_estado = st.button("🔍 Verificar Estado", width="stretch")
+        verificar_estado = st.button("🔍 Verificar Estado", use_container_width=True)
     
     with col2:
         st.markdown("### 🚀 Crear Backup")
-        ejecutar_backup = st.button("💾 Ejecutar Backup", type="primary", width="stretch")
+        ejecutar_backup = st.button("💾 Ejecutar Backup", type="primary", use_container_width=True)
     
-    # Procesar acciones fuera de las columnas para usar ancho completo
+    # Procesar acciones
     if verificar_estado:
+        st.session_state.backup_saved_msg = None
         st.markdown("---")
         check_database_status(db_url)
     
     if ejecutar_backup:
+        st.session_state.backup_result = None
+        st.session_state.backup_saved_msg = None
         st.markdown("---")
         create_backup(db_url)
+
+    # Si hay un resultado de backup en sesión, mostrar la sección de guardado/descarga de forma persistente
+    if st.session_state.backup_result and not ejecutar_backup:
+        st.markdown("---")
+        b_res = st.session_state.backup_result
+        st.info(f"📦 Tamaño del backup: {b_res['size_mb']:.2f} MB")
+        
+        if is_local_app():
+            col_save1, col_save2 = st.columns(2, gap="small")
+            with col_save1:
+                if st.button("📁 Seleccionar Carpeta y Guardar Backup", type="primary", use_container_width=True, key="btn_save_folder"):
+                    chosen_folder = select_backup_folder()
+                    if chosen_folder:
+                        destination_path = os.path.join(chosen_folder, b_res['filename'])
+                        try:
+                            with open(destination_path, "wb") as f_out:
+                                f_out.write(b_res['bytes'])
+                            st.session_state.backup_saved_msg = f"🎉 ¡Backup guardado exitosamente en: **{destination_path}**!"
+                            st.rerun()
+                        except Exception as err_save:
+                            st.error(f"❌ Error al guardar el archivo: {err_save}")
+                    else:
+                        st.warning("⚠️ No se seleccionó ninguna carpeta.")
+            with col_save2:
+                st.download_button(
+                    label="📥 Descargar por Navegador (.zip)",
+                    data=b_res['bytes'],
+                    file_name=b_res['filename'],
+                    mime="application/zip",
+                    use_container_width=True,
+                    key="btn_download_browser"
+                )
+        else:
+            st.download_button(
+                label="📥 DESCARGAR BACKUP COMPLETO (.zip)",
+                data=b_res['bytes'],
+                file_name=b_res['filename'],
+                mime="application/zip",
+                use_container_width=True,
+                key="btn_download_full"
+            )
+
+        if st.session_state.get('backup_saved_msg'):
+            st.success(st.session_state.backup_saved_msg)
+
+        # Info detallada
+        with st.expander("📋 Detalles del Backup", expanded=True):
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                st.markdown("""
+                **🎯 Archivo Principal:**
+                - `backup_database.db` - SQLite completo
+                
+                **📄 Archivos PostgreSQL:**
+                - `01_structure.sql`
+                - `02_data.sql`
+                - `restore_postgres.py`
+                """)
+            
+            with col_b:
+                st.markdown("""
+                **📊 Estadísticas:**
+                """)
+                st.metric("Registros totales", f"{b_res['total_rows']:,}")
+                st.metric("Tablas", b_res['total_tables'])
+        
+        st.markdown("""
+        ### 🚀 Ahora...:
+        
+        1. **Guarde o Descargue** el archivo ZIP utilizando los botones superiores.
+        
+        💡 **Tip:** El archivo README.txt dentro del ZIP tiene instrucciones detalladas para recuperar los datos.
+        """)
 
 def check_database_status(db_url):
     """Verifica el estado de las tablas"""
@@ -78,7 +195,7 @@ def check_database_status(db_url):
                         })
                 
                 df = pd.DataFrame(stats)
-                st.dataframe(df, width="stretch", hide_index=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
                 
                 # Resumen
                 total_tables = len(stats)
@@ -188,7 +305,6 @@ def create_sqlite_database(sqlite_file, tables_data):
         """)
         
         conn.commit()
-        # st.success("✅ Estructura SQLite creada")
         
         # 2. INSERTAR DATOS
         st.info("💾 Insertando datos en SQLite...")
@@ -525,57 +641,25 @@ SEGURIDAD:
         progress.progress(100)
         status.text("✅ Backup completado!")
         
-        # Mostrar resultado
-        # st.success("🎉 ¡Backup creado exitosamente!")
-        
-        # Información del tamaño
-        zip_size = len(zip_buffer.getvalue()) / 1024 / 1024  # MB
-        st.info(f"📦 Tamaño del backup: {zip_size:.2f} MB")
-        
-        # Botón de descarga
-        st.download_button(
-            label="📥 DESCARGAR BACKUP COMPLETO (.zip)",
-            data=zip_buffer.getvalue(),
-            file_name=f"{backup_name}.zip",
-            mime="application/zip",
-            width="stretch"
-        )
-        
-        # Info detallada
-        with st.expander("📋 Detalles del Backup", expanded=True):
-            col_a, col_b = st.columns(2)
-            
-            with col_a:
-                st.markdown("""
-                **🎯 Archivo Principal:**
-                - `backup_database.db` - SQLite completo
-                
-                **📄 Archivos PostgreSQL:**
-                - `01_structure.sql`
-                - `02_data.sql`
-                - `restore_postgres.py`
-                """)
-            
-            with col_b:
-                st.markdown("""
-                **📊 Estadísticas:**
-                """)
-                total_rows = sum(len(df) for df in tables_data.values())
-                st.metric("Registros totales", f"{total_rows:,}")
-                st.metric("Tablas", len(tables_data))
-        
-        #  st.markdown("---")
-        st.markdown("""
-        ### 🚀 Ahora...:
-        
-        1. **Descargue** el archivo ZIP. Ver botón de descarga completa arriba.
-        
-        💡 **Tip:** El archivo README.txt dentro del ZIP tiene instrucciones detalladas para recuperar los datos.
-        """)
+        zip_data_bytes = zip_buffer.getvalue()
+        backup_filename = f"{backup_name}.zip"
+        zip_size = len(zip_data_bytes) / 1024 / 1024  # MB
+
+        # Guardar resultado en session_state para persistencia
+        st.session_state.backup_result = {
+            'bytes': zip_data_bytes,
+            'filename': backup_filename,
+            'size_mb': zip_size,
+            'total_rows': sum(len(df) for df in tables_data.values()),
+            'total_tables': len(tables_data)
+        }
         
         # Limpiar archivos temporales
         shutil.rmtree(temp_dir)
-    
+        
+        # Forzar un rerun limpio para mostrar la sección de guardado/descarga persistente
+        st.rerun()
+
     except Exception as e:
         st.error(f"❌ Error creando backup: {str(e)}")
         import traceback

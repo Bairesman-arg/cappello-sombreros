@@ -265,12 +265,68 @@ def save_remito(cliente_id, fecha_entrega, fecha_retiro, observaciones_cabecera,
             
             return remito_id, precios_modificados
 
-# --- Nuevas funciones para el CRUD de artículos y rubros---
 def get_all_rubros():
     """Obtiene todos los rubros de la base de datos."""
     with engine.begin() as conn:
-        rubros_df = pd.read_sql("SELECT id, nombre_rubro FROM rubros ORDER BY nombre_rubro", conn)
+        rubros_df = pd.read_sql(text("SELECT id, nombre_rubro, fecha_alta, fecha_mod FROM rubros ORDER BY nombre_rubro"), conn)
         return rubros_df
+
+def save_new_rubro(nombre_rubro):
+    """Inserta un nuevo rubro en la base de datos."""
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO rubros (nombre_rubro, fecha_alta, fecha_mod)
+            VALUES (:nombre, :fa, :fm)
+        """), {
+            "nombre": nombre_rubro.strip(),
+            "fa": fecha_actual,
+            "fm": fecha_actual
+        })
+
+def update_existing_rubro(rubro_id, nuevo_nombre):
+    """Actualiza el nombre de un rubro existente."""
+    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE rubros
+            SET nombre_rubro = :nombre,
+                fecha_mod = :fm
+            WHERE id = :id
+        """), {
+            "nombre": nuevo_nombre.strip(),
+            "fm": fecha_actual,
+            "id": int(rubro_id)
+        })
+
+def delete_existing_rubro(rubro_id):
+    """Elimina un rubro de la base de datos."""
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM rubros WHERE id = :id"), {"id": int(rubro_id)})
+
+def check_rubro_in_use(rubro_id):
+    """Verifica si el rubro está asociado a algún artículo."""
+    with engine.begin() as conn:
+        count = conn.execute(
+            text("SELECT COUNT(*) FROM articulos WHERE rubro_id = :id"),
+            {"id": int(rubro_id)}
+        ).scalar()
+        return count > 0
+
+def check_rubro_exists(nombre_rubro, ignore_id=None):
+    """Verifica si un nombre de rubro ya existe (no sensible a mayúsculas/minúsculas)."""
+    with engine.begin() as conn:
+        if ignore_id:
+            count = conn.execute(
+                text("SELECT COUNT(*) FROM rubros WHERE UPPER(TRIM(nombre_rubro)) = UPPER(TRIM(:nombre)) AND id != :ignore_id"),
+                {"nombre": nombre_rubro, "ignore_id": int(ignore_id)}
+            ).scalar()
+        else:
+            count = conn.execute(
+                text("SELECT COUNT(*) FROM rubros WHERE UPPER(TRIM(nombre_rubro)) = UPPER(TRIM(:nombre))"),
+                {"nombre": nombre_rubro}
+            ).scalar()
+        return count > 0
 
 def get_all_articulos():
     """Obtiene todos los artículos de la base de datos, incluyendo el nombre del rubro."""
