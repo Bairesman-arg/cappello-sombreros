@@ -329,7 +329,7 @@ def remitos_ventas_movil():
                     dev = int(df_items.loc[idx, 'devueltos'])
                     obs_val = str(df_items.loc[idx, 'observaciones']) if pd.notna(df_items.loc[idx, 'observaciones']) else ""
 
-                    st.markdown(f"### **Art. {nro_art} - {desc}**")
+                    st.markdown(f'<div style="font-size: 1.05rem; font-weight: 600; margin-top: 0.4rem; margin-bottom: 0.4rem;">Art. {nro_art} - {desc}</div>', unsafe_allow_html=True)
                     
                     # Controles completos de edición por artículo (Precio Real, Entregados, Devueltos, Obs)
                     c_p, c_e = st.columns(2)
@@ -413,14 +413,13 @@ def remitos_ventas_movil():
                 t_ent = t_dev = t_vend = 0
                 t_util = 0.0
 
-            st.divider()
             st.subheader("Totales y Utilidad")
             col_t1, col_t2 = st.columns(2)
             with col_t1:
                 st.metric("Total Entregados", t_ent)
-                st.metric("Total Vendidos", t_vend)
-            with col_t2:
                 st.metric("Total Devueltos", t_dev)
+            with col_t2:
+                st.metric("Total Vendidos", t_vend)
                 st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
 
             # === Acciones Principales ===
@@ -441,34 +440,6 @@ def remitos_ventas_movil():
             if st.button("Seleccionar Otro Remito", type="primary" if is_excel_saved else "secondary", width="stretch", disabled=st.session_state.show_confirm_modal_movil):
                 st.session_state.should_reset_all_movil = True
                 st.rerun()
-
-            is_retiro_for_excel = not is_recepcion_dia
-            excel_btn_label = f"Sobreescribir Remito Original en Excel #{remito_id}" if is_recepcion_dia else f"Actualizar Remito de Ventas en Excel #{remito_id}"
-
-            if is_remito_saved and not is_excel_saved:
-                try:
-                    if is_local_app():
-                        if st.button(excel_btn_label, type="primary", width="stretch"):
-                            last_folder = st.session_state.get('last_used_folder')
-                            success, msg, chosen_folder = process_generate_remito(remito_id, is_retiro=is_retiro_for_excel, default_dir=last_folder)
-                            if success:
-                                st.session_state.last_used_folder = chosen_folder
-                                st.session_state.remito_generado_msg_movil = f"🎉 ¡Remito #{remito_id} guardado exitosamente en: **{msg}**!"
-                                st.session_state.excel_saved_movil = True
-                            st.rerun()
-                    else:
-                        excel_buffer = gen_remito(remito_id, is_retiro=is_retiro_for_excel)
-                        if st.download_button(label=excel_btn_label, type="primary", width="stretch", data=excel_buffer, file_name=get_remito_filename(remito_id, is_retiro=is_retiro_for_excel), mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
-                            st.session_state.excel_saved_movil = True
-                            st.session_state.remito_generado_msg_movil = f"🎉 ¡Remito #{remito_id} descargado exitosamente!"
-                            st.rerun()
-                except Exception as e:
-                    st.error(f"Error Excel: {e}")
-            else:
-                st.button(excel_btn_label, width="stretch", disabled=True)
-
-            if st.session_state.get("remito_generado_msg_movil"):
-                st.success(st.session_state.remito_generado_msg_movil)
 
 if __name__ == "__main__":
     remitos_ventas_movil()
