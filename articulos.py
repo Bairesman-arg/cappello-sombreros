@@ -352,8 +352,36 @@ def articulos_crud():
                 st.rerun()
 
     # --- Seccion del filtro personalizado ---
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stElementContainer"]:has(button[key*="btn_excel"]),
+        div.stButton:has(button[key*="btn_excel"]) {
+            display: flex !important;
+            width: 100% !important;
+        }
+        button[key*="btn_excel"] {
+            height: 38px !important;
+            min-height: 38px !important;
+            font-size: 0.82rem !important;
+            padding: 0px 10px !important;
+            line-height: 1 !important;
+            border-radius: 4px !important;
+            width: 100% !important;
+        }
+        button[key*="btn_excel"] p {
+            font-size: 0.82rem !important;
+            line-height: 1 !important;
+            margin: 0 !important;
+            white-space: nowrap !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     st.subheader("Filtrar Artículos")
-    col_input, col_btn = st.columns([3.5, 1],gap="small")
+    col_input, col_btn, col_excel = st.columns([2.4, 1.1, 0.9], gap="small", vertical_alignment="bottom")
 
     with col_input:
         filter_term = st.text_input(
@@ -361,7 +389,6 @@ def articulos_crud():
             key="filter_term",
             placeholder="Ingrese un código, una descripción o parte de ellas...",
             label_visibility="collapsed",
-            width="stretch",
             value=st.session_state.frase_filtrada,
             disabled=not st.session_state.view_grilla
         )
@@ -371,11 +398,15 @@ def articulos_crud():
                      type="primary", 
                      width="stretch",
                      disabled=not st.session_state.view_grilla):
-            # Guardar el texto actual como filtro activo
             st.session_state.frase_filtrada = filter_term.strip()
             st.session_state.do_filter = True
             st.rerun()
     
+    with col_excel:
+        if st.session_state.view_grilla and not st.session_state.articulos_df.empty:
+            if st.button("📊 Enviar a Excel", key="btn_excel_articulos", width="stretch", help="Seleccionar carpeta y guardar datos de la grilla en Excel (.xlsx)"):
+                config.save_excel_with_folder_dialog(st.session_state.filtered_df, "Articulos", drop_cols=['Seleccionado'])
+
     # Lógica de filtrado
     estado_grilla = "totales"
     # Si hay una frase filtrada previa, usarla aunque no se haya presionado el botón
@@ -393,10 +424,12 @@ def articulos_crud():
         st.session_state.filtered_df = st.session_state.articulos_df.copy()
 
     if st.session_state.view_grilla:
+        if st.session_state.get('excel_saved_msg_Articulos'):
+            st.success(st.session_state.pop('excel_saved_msg_Articulos'))
 
-        st.header(f"Maestro de Artículos ({len(st.session_state.filtered_df)} {estado_grilla})")
+        st.subheader(f"Maestro de Artículos ({len(st.session_state.filtered_df)} {estado_grilla})")
+
         if not st.session_state.filtered_df.empty:
-
             # --- Parámetros de configuración ---
             max_filas_a_mostrar = 20
             alto_del_encabezado = 35
@@ -428,18 +461,23 @@ def articulos_crud():
             # Se Cambia la key del data_editor cada vez por posibles selecciones de registro
             editor_key = f"articulos_grid_{st.session_state.get('grid_version', 0)}"
 
-            def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 40, padding: int = 0) -> int:
-                # Calcula un ancho aproximado en píxeles para una columna del DataFrame
-                # basado en la longitud del valor más largo.
+            def calcular_ancho_columna(df: pd.DataFrame, columna: str, min_width: int = 60, padding: int = 25) -> int:
+                """Calcula un ancho dinámico optimizado en píxeles para columnas de la grilla de Streamlit."""
                 if columna in df.columns:
-                    # Convertimos todo a string para contar caracteres
-                    max_chars = max(len(str(x)) for x in df[columna])
-                    max_chars = max(max_chars,len(columna))
-                    
-                    # Estimación: ~8 px por carácter + padding extra
-                    return max(min_width, max_chars * 8 + padding)
-                else:
-                    return min_width
+                    if columna in ['costo', 'precio_real', 'precio_publico']:
+                        try:
+                            max_val = max(abs(float(x)) for x in df[columna] if pd.notnull(x) and str(x) != '') if not df.empty else 0
+                        except:
+                            max_val = 0
+                        val_str = f"$ {max_val:,.2f}"
+                        max_chars = max(len(val_str), len(columna) + 3)
+                        padding += 10
+                    else:
+                        max_chars = max(len(str(x)) for x in df[columna]) if not df.empty else 0
+                        max_chars = max(max_chars, len(columna))
+                        
+                    return max(min_width, max_chars * 9 + padding)
+                return min_width
 
             # Usar column_config para el formateo de la tabla
             edited_df = st.data_editor(

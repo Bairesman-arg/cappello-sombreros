@@ -320,7 +320,7 @@ def remitos_entregas():
     with c1:
         add_clicked = st.button(
             "Agregar Item ➕",
-            use_container_width=True,
+            width="stretch",
             disabled=(articulo_sel is None or articulo_existe or
                      st.session_state.is_form_disabled)
         )
@@ -328,7 +328,7 @@ def remitos_entregas():
     with c2:
         mod_clicked = st.button(
             "Modificar Item ✍️",
-            use_container_width=True,
+            width="stretch",
             disabled=(articulo_sel is None or not articulo_existe or
                      st.session_state.is_form_disabled)
         )
@@ -336,19 +336,26 @@ def remitos_entregas():
     with c3:
         del_clicked = st.button(
             "Eliminar Item 🗑️",
-            use_container_width=True,
+            width="stretch",
             disabled=(articulo_sel is None or not articulo_existe or
                      st.session_state.is_form_disabled)
         )
 
+    porc_dto_val = float(st.session_state.get('porc_dto', 0) or 0)
+
     # Procesar acciones de items
     if add_clicked:
+        articulo_info = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == articulo_sel].iloc[0]
+        costo_val = float(articulo_info['costo']) if ('costo' in articulo_info and pd.notna(articulo_info['costo'])) else 0.0
+        p_neto = st.session_state.precio_real_input * (1.0 - (porc_dto_val / 100.0))
+
         if st.session_state.entregados_input < 1:
             st.error("La cantidad entregada debe ser 1 o mayor.")
         elif st.session_state.precio_real_input <= 0:
             st.error("El precio real debe ser mayor a cero. Vuelva a seleccionar el artículo.")
+        elif p_neto < costo_val:
+            st.error(f"⚠️ El Precio Real (${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${p_neto:,.2f} vs Costo: ${costo_val:,.2f}).")
         else:
-            articulo_info = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == articulo_sel].iloc[0]
             new_item = {
                 'Articulo': articulo_sel,
                 'Descripción': articulo_info['descripcion'],
@@ -370,13 +377,18 @@ def remitos_entregas():
             st.rerun()
 
     if mod_clicked and articulo_existe:
+        articulo_info = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == articulo_sel].iloc[0]
+        costo_val = float(articulo_info['costo']) if ('costo' in articulo_info and pd.notna(articulo_info['costo'])) else 0.0
+        p_neto = st.session_state.precio_real_input * (1.0 - (porc_dto_val / 100.0))
+
         if st.session_state.entregados_input < 1:
             st.error("La cantidad entregada debe ser 1 o mayor.")
+        elif p_neto < costo_val:
+            st.error(f"⚠️ El Precio Real (${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${p_neto:,.2f} vs Costo: ${costo_val:,.2f}).")
         else:
             idx = st.session_state.items_data.index[
                 st.session_state.items_data['Articulo'] == articulo_sel
             ][0]
-            articulo_info = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == articulo_sel].iloc[0]
 
             st.session_state.items_data.loc[idx, :] = {
                 'Articulo': articulo_sel,
@@ -451,7 +463,7 @@ def remitos_entregas():
     # Botón Guardar
     say_error = False
     with col_buttons[0]:
-        if st.button("Guardar Remito", type="primary", use_container_width=True,
+        if st.button("Guardar Remito", type="primary", width="stretch",
                     disabled=st.session_state.is_form_disabled or is_remito_saved):
             if not can_save:
                 say_error = True
@@ -473,7 +485,7 @@ def remitos_entregas():
     with col_buttons[1]:
         nuevo_remito_disabled = st.session_state.is_form_disabled
 
-        if st.button("Nuevo Remito", use_container_width=True,
+        if st.button("Nuevo Remito", width="stretch",
                     disabled=nuevo_remito_disabled):
             st.session_state.porc_dto = None
             if st.session_state.items_data.empty or is_remito_saved:
@@ -487,12 +499,12 @@ def remitos_entregas():
     with col_buttons[2]:
         if is_remito_saved:
             if is_local_app():
-                if st.button(f"Generar Remito en Excel #{st.session_state.remito_id}", use_container_width=True, key=f"btn_gen_{st.session_state.remito_id}"):
+                if st.button(f"Generar Remito en Excel #{st.session_state.remito_id}", width="stretch", key=f"btn_gen_{st.session_state.remito_id}"):
                     last_folder = st.session_state.get('last_used_folder')
                     success, msg, chosen_folder = process_generate_remito(st.session_state.remito_id, is_retiro=False, default_dir=last_folder)
                     if success:
                         st.session_state.last_used_folder = chosen_folder
-                        st.session_state.remito_generado_msg = f"📁 Remito #{st.session_state.remito_id} guardado exitosamente en:\n`{msg}`"
+                        st.session_state.remito_generado_msg = f"📁 Remito #{st.session_state.remito_id} guardado exitosamente en: **{msg}**"
                         st.toast(f"Remito #{st.session_state.remito_id} guardado con éxito", icon="📁")
                     else:
                         st.session_state.remito_generado_msg = None
@@ -502,13 +514,13 @@ def remitos_entregas():
                 excel_buffer = gen_remito(st.session_state.remito_id, is_retiro=False)
                 st.download_button(
                     label=f"Generar Remito en Excel #{st.session_state.remito_id}",
-                    use_container_width=True,
+                    width="stretch",
                     data=excel_buffer,
                     file_name=get_remito_filename(st.session_state.remito_id, is_retiro=False),
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
         else:
-            st.button("Generar Remito en Excel", use_container_width=True, disabled=True)
+            st.button("Generar Remito en Excel", width="stretch", disabled=True)
 
     if say_error:
         st.error("Por favor, seleccione un cliente y agregue al menos un item.")
@@ -587,6 +599,7 @@ def remitos_entregas():
 
                 function doSelect(el) {{
                     if (!el || doc.activeElement !== el) return;
+                    if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'button' || el.type === 'submit') return;
                     try {{
                         if (typeof el.select === 'function') {{
                             el.select();
@@ -597,9 +610,6 @@ def remitos_entregas():
                             el.setSelectionRange(0, el.value.length);
                         }}
                     }} catch(e2) {{}}
-                    try {{
-                        doc.execCommand('selectAll', false, null);
-                    }} catch(e3) {{}}
                 }}
 
                 window.parent._selectHandlerEntregas = function(e) {{
@@ -607,6 +617,7 @@ def remitos_entregas():
                     if (!target) return;
                     const tag = (target.tagName || '').toUpperCase();
                     if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
+                    if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'button' || target.type === 'submit') return;
 
                     if (target.dataset.autoSelecting === 'true') return;
                     target.dataset.autoSelecting = 'true';

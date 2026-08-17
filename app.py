@@ -34,6 +34,21 @@ def whereami():
 RUTASCRIPT = whereami()
 
 def app():
+    # Inyectar idioma español en el documento principal para tooltips nativos del navegador en TODO el sistema
+    st.components.v1.html(
+        """
+        <script>
+            (function() {
+                const doc = window.parent.document;
+                if (doc && doc.documentElement) {
+                    doc.documentElement.lang = 'es';
+                }
+            })();
+        </script>
+        """,
+        height=0,
+    )
+
     # Si el programa se ejecuta como un script de Python...
     with st.sidebar:
         st.markdown(
@@ -64,7 +79,8 @@ def app():
                                options=["Codigos de Barra", "Clientes", "Articulos", "Rubros", "Remitos", "Informes", "Backup"],
                                icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
                                menu_icon="app-indicator",
-                               default_index=0)
+                               default_index=0,
+                               key="main_menu_nav")
 
         # Detectar cambio de página
         if mainmenu != st.session_state.currentpage:
@@ -72,36 +88,38 @@ def app():
             claves_a_limpiar = [
                 'clientes_df',
                 'articulos_df',
-                'backup_manager'  # NUEVO: Limpiar manager de backup
+                'backup_manager'
             ]
             for clave in claves_a_limpiar:
                 if clave in st.session_state:
                     del st.session_state[clave]
 
-            # Actualizar la página actual y forzar recarga completa
+            # Actualizar la página actual en session_state
             st.session_state.currentpage = mainmenu
-            st.rerun()
 
         # Submenús
         if mainmenu == "Remitos":
             submenu = option_menu(menu_title="Remitos",
-                                      options=["Entregas", "Recepciones", "Anulaciones"],
-                                      icons=["file-earmark-plus", "file-earmark-plus", "file-earmark-plus"],
-                                      menu_icon="folder", default_index=0, orientation="vertical")
+                                  options=["Entregas", "Recepciones", "Anulaciones"],
+                                  icons=["file-earmark-plus", "file-earmark-plus", "file-earmark-plus"],
+                                  menu_icon="folder", default_index=0, orientation="vertical",
+                                  key="remitos_submenu_nav")
 
         elif mainmenu == "Articulos":
             submenu = option_menu(menu_title="Articulos",
-                                      options=["ABM Articulos", "Cargar Novedades"],
-                                      icons=["file-earmark-plus", "file-earmark-plus"],
-                                      menu_icon="folder", default_index=0, orientation="vertical")
+                                  options=["ABM Articulos", "Cargar Novedades"],
+                                  icons=["file-earmark-plus", "file-earmark-plus"],
+                                  menu_icon="folder", default_index=0, orientation="vertical",
+                                  key="articulos_submenu_nav")
         
         elif mainmenu == "Backup":
             submenu = option_menu(menu_title="Backup",
-                                      options=["Crear Backup", "Restaurar Backup"],
-                                      icons=["download", "upload"],
-                                      menu_icon="shield-check", 
-                                      default_index=0, 
-                                      orientation="vertical")
+                                  options=["Crear Backup", "Restaurar Backup"],
+                                  icons=["download", "upload"],
+                                  menu_icon="shield-check", 
+                                  default_index=0, 
+                                  orientation="vertical",
+                                  key="backup_submenu_nav")
         else:
             submenu = None
 

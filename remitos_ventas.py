@@ -66,6 +66,10 @@ def remitos_ventas():
         st.session_state.success_shown = False
     if "remito_saved" not in st.session_state:
         st.session_state.remito_saved = False
+    if "excel_saved" not in st.session_state:
+        st.session_state.excel_saved = False
+    if "remito_generado_msg" not in st.session_state:
+        st.session_state.remito_generado_msg = None
 
     if "articulos_df" not in st.session_state or "clientes_df" not in st.session_state:
         st.session_state.clientes_df, st.session_state.articulos_df = get_clients_and_articles()
@@ -95,11 +99,13 @@ def remitos_ventas():
         st.session_state.is_form_disabled = False
         st.session_state.success_shown = False
         st.session_state.remito_saved = False
+        st.session_state.excel_saved = False
+        st.session_state.remito_generado_msg = None
         st.session_state.input_remito_rec = 1
         st.rerun()
 
     # Control de estado del formulario
-    st.session_state.is_form_disabled = st.session_state.show_confirm_modal
+    st.session_state.is_form_disabled = st.session_state.show_confirm_modal or st.session_state.excel_saved
 
     # --- Entrada de número de remito ---
     col1, _ = st.columns([1, 4], gap="small")
@@ -127,6 +133,8 @@ def remitos_ventas():
                 st.session_state["remito_activo_rec"] = remito_id
                 st.session_state["carga_exitosa"] = True
                 st.session_state.remito_saved = False  # Reset cuando se carga un nuevo remito
+                st.session_state.excel_saved = False
+                st.session_state.remito_generado_msg = None
                 st.session_state.success_shown = False
                 clear_item_inputs_rec()
             else:
@@ -166,7 +174,20 @@ def remitos_ventas():
         if cab_key in st.session_state and items_key in st.session_state:
             cab = st.session_state[cab_key]
             
-            st.subheader(f"#{remito_id}  |  Cliente: {cab['razon_social']} (Boca {cab['boca']})")
+            porc_dto_val = float(cab.get("porc_dto", 0) or 0)
+            dto_str = f"{porc_dto_val:g}%"
+            st.subheader(f"#{remito_id}  |  Cliente: {cab['razon_social']} (Boca {cab['boca']})  |  Dto. {dto_str}")
+
+            if f"recepcion_el_dia_{remito_id}" not in st.session_state:
+                st.session_state[f"recepcion_el_dia_{remito_id}"] = False
+
+            is_recepcion_dia = bool(st.session_state[f"recepcion_el_dia_{remito_id}"])
+            habia_fecha_previa = cab.get("fecha_retiro") is not None
+
+            if is_recepcion_dia:
+                cab["fecha_retiro"] = None
+                if f"fecha_retiro_{remito_id}" in st.session_state:
+                    st.session_state[f"fecha_retiro_{remito_id}"] = None
 
             col_izq, col_der = st.columns(2, gap="small")
 
@@ -178,13 +199,31 @@ def remitos_ventas():
                     disabled=True,
                     key=f"fecha_entrega_{remito_id}"
                 )
-                nueva_fecha_retiro = st.date_input(
-                    "Fecha de Retiro",
-                    value=cab["fecha_retiro"],
-                    format="DD/MM/YYYY",
-                    key=f"fecha_retiro_{remito_id}",
-                    disabled=st.session_state.is_form_disabled
-                )
+                if is_recepcion_dia:
+                    nueva_fecha_retiro = None
+                    st.date_input(
+                        "Fecha de Retiro",
+                        value=None,
+                        format="DD/MM/YYYY",
+                        key=f"fecha_retiro_{remito_id}",
+                        disabled=True
+                    )
+                    if habia_fecha_previa:
+                        st.warning("⚠️ Recepción en el Día: La Fecha de Retiro quedará en blanco.")
+                else:
+                    fecha_entrega_val = cab.get("fecha_entrega")
+                    val_fecha_ret = cab.get("fecha_retiro")
+                    if val_fecha_ret and fecha_entrega_val and val_fecha_ret < fecha_entrega_val:
+                        val_fecha_ret = fecha_entrega_val
+
+                    nueva_fecha_retiro = st.date_input(
+                        "Fecha de Retiro",
+                        value=val_fecha_ret,
+                        min_value=fecha_entrega_val,
+                        format="DD/MM/YYYY",
+                        key=f"fecha_retiro_{remito_id}",
+                        disabled=st.session_state.is_form_disabled
+                    )
 
             with col_der:
                 nuevas_observaciones = st.text_area(
@@ -223,6 +262,7 @@ def remitos_ventas():
                 )
 
                 if should_preload:
+                    rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
                     st.session_state.articulo_precargado_rec = articulo_sel
 
                     # Pre-cargar datos si el artículo existe en los items actuales
@@ -240,6 +280,7 @@ def remitos_ventas():
                             st.session_state.observaciones_item_input_rec = ""
                         else:
                             st.session_state.precio_real_input_rec = 0.0
+                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.session_state.focus_target = "entregados"
                     st.rerun()
 
@@ -273,33 +314,44 @@ def remitos_ventas():
             with c_btn1:
                 add_clicked = st.button(
                     "Agregar Item ➕",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=(articulo_sel is None or st.session_state.is_form_disabled)
                 )
 
             with c_btn2:
                 del_clicked = st.button(
                     "Eliminar Item 🗑️",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=(articulo_sel is None or st.session_state.is_form_disabled)
                 )
 
             if add_clicked:
+                rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
                 if items_key in st.session_state and not st.session_state[items_key].empty and articulo_sel in st.session_state[items_key]['nro_articulo'].values:
                     st.session_state.item_rec_message = ("warning", "⚠️ No puede ser agregado. Item existente en el Remito!")
                     st.session_state.should_clear_items_rec = True
+                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 elif st.session_state.entregados_input_rec < 1:
                     st.session_state.item_rec_message = ("error", "⚠️ La cantidad entregada debe ser 1 o mayor.")
+                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 elif st.session_state.precio_real_input_rec <= 0:
                     st.session_state.item_rec_message = ("error", "⚠️ El precio real debe ser mayor a cero.")
+                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 else:
                     matching = st.session_state.articulos_df.loc[st.session_state.articulos_df['nro_articulo'] == articulo_sel]
                     if not matching.empty:
                         articulo_info = matching.iloc[0]
                         costo_val = float(articulo_info['costo']) if ('costo' in articulo_info and pd.notna(articulo_info['costo'])) else 0.0
+                        porc_dto_val = float(cab.get("porc_dto", 0) or 0)
+                        precio_neto_input = st.session_state.precio_real_input_rec * (1.0 - (porc_dto_val / 100.0))
+                        if precio_neto_input < costo_val:
+                            st.session_state.item_rec_message = ("error", f"⚠️ El Precio Real (${st.session_state.precio_real_input_rec:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${precio_neto_input:,.2f} vs Costo: ${costo_val:,.2f}).")
+                            st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
+                            st.rerun()
+
                         new_row = pd.DataFrame([{
                             'id_articulo': int(articulo_info['id']),
                             'nro_articulo': str(articulo_sel),
@@ -313,12 +365,15 @@ def remitos_ventas():
                         st.session_state[items_key] = pd.concat([st.session_state[items_key], new_row], ignore_index=True)
                         st.session_state.remito_saved = False
                         st.session_state.should_clear_items_rec = True
+                        st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                         st.rerun()
 
             if del_clicked:
+                rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
                 if items_key in st.session_state and (st.session_state[items_key].empty or articulo_sel not in st.session_state[items_key]['nro_articulo'].values):
                     st.session_state.item_rec_message = ("warning", "⚠️ No puede ser eliminado. Item inexistente en el Remito!")
                     st.session_state.should_clear_items_rec = True
+                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 else:
                     st.session_state[items_key] = st.session_state[items_key][
@@ -327,6 +382,7 @@ def remitos_ventas():
                     st.session_state.remito_saved = False
                     st.session_state.item_rec_message = ("warning", "Artículo eliminado")
                     st.session_state.should_clear_items_rec = True
+                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
 
             if "item_rec_message" in st.session_state and st.session_state.item_rec_message:
@@ -339,7 +395,14 @@ def remitos_ventas():
                     st.success(msg_text)
                 del st.session_state.item_rec_message
 
-            st.subheader(f"Items del Remito #{remito_id}")
+            col_head1, col_head2 = st.columns([4, 1], gap="small", vertical_alignment="center")
+            with col_head1:
+                st.subheader(f"Items del Remito #{remito_id}")
+            with col_head2:
+                st.checkbox("Recepción en el Día", key=f"recepcion_el_dia_{remito_id}", disabled=st.session_state.is_form_disabled)
+
+            if st.session_state.get(f"recepcion_el_dia_{remito_id}", False):
+                st.success("Los Cambios afectarán al REMITO ORIGINAL reemplazando al anterior. Las VENTAS quedan pendientes a la Próxima Recepción.")
 
             col_edit, col_calc = st.columns([4, 1], gap="small")
             
@@ -400,6 +463,9 @@ def remitos_ventas():
             items_precio_invalidos = pd.DataFrame()
             items_entregados_invalidos = pd.DataFrame()
             try:
+                if df_editado.empty:
+                    st.warning("⚠️ El remito debe tener al menos un artículo cargado.")
+
                 if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
                     items_invalidos = df_editado[df_editado["devueltos"] > df_editado["entregados"]]
                     if not items_invalidos.empty:
@@ -414,6 +480,19 @@ def remitos_ventas():
                         articulos_precio_str = "[" + ", ".join(str(x) for x in articulos_precio) + "]"
                         st.warning(f"⚠️ Los artículos {articulos_precio_str} tienen un Precio Real inválido (debe ser mayor a 0). Corregir antes de guardar.")
 
+                items_precio_menor_costo = pd.DataFrame()
+                if "precio_real" in df_editado.columns and "costo" in df_editado.columns:
+                    porc_dto_val = float(cab.get("porc_dto", 0) or 0)
+                    precio_neto_ser = df_editado["precio_real"].fillna(0).astype(float) * (1.0 - (porc_dto_val / 100.0))
+                    items_precio_menor_costo = df_editado[(precio_neto_ser < df_editado["costo"]) & (df_editado["costo"] > 0)]
+                    if not items_precio_menor_costo.empty:
+                        articulos_menores = items_precio_menor_costo["nro_articulo"].tolist()
+                        articulos_menores_str = "[" + ", ".join(str(x) for x in articulos_menores) + "]"
+                        if porc_dto_val > 0:
+                            st.warning(f"⚠️ El artículo {articulos_menores_str} tiene un Precio Real que no deja utilidad (con el {porc_dto_val:.0f}% de descuento queda por debajo del Costo). Corregir antes de guardar.")
+                        else:
+                            st.warning(f"⚠️ El artículo {articulos_menores_str} tiene un Precio Real que no deja utilidad (es menor a su Costo). Corregir antes de guardar.")
+
                 if "entregados" in df_editado.columns:
                     items_entregados_invalidos = df_editado[df_editado["entregados"].isna() | (df_editado["entregados"] <= 0)]
                     if not items_entregados_invalidos.empty:
@@ -423,6 +502,25 @@ def remitos_ventas():
 
             except Exception as e:
                 st.error(f"Error en validación: {str(e)}")
+
+            # Validar Fecha de Retiro según si es Recepción en el Día
+            is_recepcion_dia_current = bool(st.session_state.get(f"recepcion_el_dia_{remito_id}", False))
+
+            if is_recepcion_dia_current:
+                nueva_fecha_retiro = None
+                fecha_retiro_error = False
+            else:
+                f_entrega = cab.get("fecha_entrega")
+                if nueva_fecha_retiro is None:
+                    fecha_retiro_error = True
+                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro para realizar la Recepción.")
+                elif f_entrega and nueva_fecha_retiro < f_entrega:
+                    fecha_retiro_error = True
+                    f_ent_str = f_entrega.strftime("%d/%m/%Y") if hasattr(f_entrega, "strftime") else str(f_entrega)
+                    f_ret_str = nueva_fecha_retiro.strftime("%d/%m/%Y") if hasattr(nueva_fecha_retiro, "strftime") else str(nueva_fecha_retiro)
+                    st.warning(f"⚠️ La Fecha de Retiro ({f_ret_str}) no puede ser anterior a la Fecha de Entrega ({f_ent_str}).")
+                else:
+                    fecha_retiro_error = False
 
             with col_calc:
                 st.markdown("#### Vendidos")
@@ -447,33 +545,42 @@ def remitos_ventas():
                     st.info("Datos no disponibles")
 
             # --- Totales y Utilidades ---
+            total_entregados = 0
+            total_devueltos = 0
+            total_vendidos = 0
             total_utilidades = 0.0
-            if isinstance(df_editado, pd.DataFrame) and "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
+
+            if isinstance(df_editado, pd.DataFrame) and not df_editado.empty and "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
                 try:
-                    entregados_clean = df_editado["entregados"].fillna(0).astype(int)
-                    devueltos_clean = df_editado["devueltos"].fillna(0).astype(int)
+                    entregados_clean = df_editado["entregados"].fillna(0).apply(lambda x: max(0, int(x)) if pd.notna(x) else 0)
+                    devueltos_clean = df_editado["devueltos"].fillna(0).apply(lambda x: max(0, int(x)) if pd.notna(x) else 0)
                     vendidos_clean = (entregados_clean - devueltos_clean).clip(lower=0)
 
                     total_entregados = int(entregados_clean.sum())
                     total_devueltos = int(devueltos_clean.sum())
                     total_vendidos = int(vendidos_clean.sum())
 
-                    # Porcentaje de descuento (clientes.porc_dto)
                     porc_dto_val = float(cab.get("porc_dto", 0) or 0)
 
-                    # Precio real del remito y costo del artículo desde base de datos
                     precio_real_ser = df_editado["precio_real"].fillna(0).astype(float) if "precio_real" in df_editado.columns else pd.Series(0.0, index=df_editado.index)
                     costo_ser = df_editado["costo"].fillna(0).astype(float) if "costo" in df_editado.columns else pd.Series(0.0, index=df_editado.index)
 
-                    # Utilidad unitaria = (precio_real - porcentaje_descuento) - costo
-                    precio_con_dto = precio_real_ser * (1.0 - (porc_dto_val / 100.0))
-                    utilidad_unitaria = precio_con_dto - costo_ser
+                    utilidades_filas = []
+                    for idx in df_editado.index:
+                        p_real = float(precio_real_ser.loc[idx]) if idx in precio_real_ser.index else 0.0
+                        c_val = float(costo_ser.loc[idx]) if idx in costo_ser.index else 0.0
+                        v_cant = int(vendidos_clean.loc[idx]) if idx in vendidos_clean.index else 0
 
-                    # Utilidad total = suma de (utilidad_unitaria * vendidos)
-                    total_utilidades = float((utilidad_unitaria * vendidos_clean).sum())
-                except:
-                    total_entregados = total_devueltos = total_vendidos = 0
-                    total_utilidades = 0.0
+                        if p_real > 0 and v_cant > 0:
+                            p_dto = p_real * (1.0 - (porc_dto_val / 100.0))
+                            u_unit = p_dto - c_val
+                            utilidades_filas.append(u_unit * v_cant)
+                        else:
+                            utilidades_filas.append(0.0)
+
+                    total_utilidades = float(sum(utilidades_filas))
+                except Exception as e_util:
+                    st.error(f"Error al calcular utilidades: {str(e_util)}")
             else:
                 total_entregados = total_devueltos = total_vendidos = 0
                 total_utilidades = 0.0
@@ -491,8 +598,9 @@ def remitos_ventas():
             st.header("Acciones del Remito")
 
             # Verificar que no haya errores de validación
-            tiene_errores = not items_invalidos.empty or not items_precio_invalidos.empty or not items_entregados_invalidos.empty
+            tiene_errores = df_editado.empty or not items_invalidos.empty or not items_precio_invalidos.empty or not items_entregados_invalidos.empty or not items_precio_menor_costo.empty or fecha_retiro_error
             is_remito_saved = st.session_state.remito_saved
+            is_excel_saved = st.session_state.excel_saved
             can_save = not tiene_errores  # En ventas, solo necesitamos que no haya errores
 
             col_buttons = st.columns(3, gap="small")
@@ -500,8 +608,8 @@ def remitos_ventas():
             # Botón Actualizar Datos Remito
             say_error = False
             with col_buttons[0]:
-                if st.button("Actualizar Datos Remito", type="primary", use_container_width=True,
-                            disabled=st.session_state.is_form_disabled or is_remito_saved or tiene_errores):
+                if st.button("Actualizar Datos Remito", type="primary" if not is_remito_saved else "secondary", width="stretch",
+                            disabled=st.session_state.is_form_disabled or is_remito_saved or is_excel_saved or tiene_errores):
                     if not can_save:
                         say_error = True
                     else:
@@ -520,58 +628,66 @@ def remitos_ventas():
                             st.session_state.error_grabacion = True
                             st.rerun()
 
-            # Botón Nuevo Remito
+            # Botón Seleccionar Otro Remito
             with col_buttons[1]:
-                nuevo_remito_disabled = st.session_state.is_form_disabled
-
-                if st.button("Nuevo Remito", use_container_width=True,
-                            disabled=nuevo_remito_disabled):
-                    if is_remito_saved:
+                if st.button("Seleccionar Otro Remito", type="primary" if is_excel_saved else "secondary", width="stretch",
+                            disabled=st.session_state.show_confirm_modal):
+                    if is_remito_saved or is_excel_saved:
                         st.session_state.should_reset_all = True
                         st.rerun()
                     else:
                         st.session_state.show_confirm_modal = True
                         st.rerun()
 
-            # Botón Generar/Actualizar Remito en Excel
+            # Botón Generar/Actualizar/Sobreescribir Remito en Excel
             with col_buttons[2]:
-                if is_remito_saved:
+                is_retiro_for_excel = not is_recepcion_dia
+                excel_btn_label = f"Sobreescribir Remito Original en Excel #{remito_id}" if is_recepcion_dia else f"Actualizar Remito de Ventas en Excel #{remito_id}"
+                excel_disabled_label = "Sobreescribir Remito Original en Excel" if is_recepcion_dia else "Actualizar Remito de Ventas en Excel"
+
+                if is_remito_saved and not is_excel_saved:
                     try:
                         if is_local_app():
-                            if st.button(f"Actualizar Remito en Excel #{remito_id}", use_container_width=True, key=f"btn_gen_{remito_id}"):
+                            if st.button(excel_btn_label, type="primary", width="stretch", key=f"btn_gen_{remito_id}"):
                                 last_folder = st.session_state.get('last_used_folder')
-                                success, msg, chosen_folder = process_generate_remito(remito_id, is_retiro=True, default_dir=last_folder)
+                                success, msg, chosen_folder = process_generate_remito(remito_id, is_retiro=is_retiro_for_excel, default_dir=last_folder)
                                 if success:
                                     st.session_state.last_used_folder = chosen_folder
+                                    st.session_state.remito_generado_msg = f"🎉 ¡Remito #{remito_id} guardado exitosamente en: **{msg}**!"
+                                    st.session_state.excel_saved = True
                                     st.toast(f"Remito #{remito_id} guardado con éxito", icon="📁")
-                                    time.sleep(1)
-                                    st.session_state.should_reset_all = True
-                                    st.rerun()
                                 else:
+                                    st.session_state.remito_generado_msg = None
                                     st.info(msg)
+                                st.rerun()
                         else:
-                            excel_buffer = gen_remito(remito_id, is_retiro=True)
+                            excel_buffer = gen_remito(remito_id, is_retiro=is_retiro_for_excel)
                             download_clicked = st.download_button(
-                                label=f"Actualizar Remito en Excel #{remito_id}",
-                                use_container_width=True,
+                                label=excel_btn_label,
+                                type="primary",
+                                width="stretch",
                                 data=excel_buffer,
-                                file_name=get_remito_filename(remito_id, is_retiro=True),
+                                file_name=get_remito_filename(remito_id, is_retiro=is_retiro_for_excel),
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key=f"download_remito_{remito_id}"
                             )
                             if download_clicked:
-                                st.session_state.should_reset_all = True
+                                st.session_state.excel_saved = True
+                                st.session_state.remito_generado_msg = f"🎉 ¡Remito #{remito_id} descargado exitosamente por el navegador!"
                                 st.rerun()
                     except Exception as e:
                         st.error(f"Error al generar el remito: {str(e)}")
                 else:
-                    st.button("Actualizar Remito en Excel", use_container_width=True, disabled=True)
+                    st.button(excel_disabled_label, width="stretch", disabled=True)
 
             if say_error:
                 st.error("Hay errores de validación que deben corregirse antes de guardar.")
 
             if tiene_errores:
                 st.caption("⚠️ Botón Guardar deshabilitado por errores de validación")
+
+            if st.session_state.get('remito_generado_msg'):
+                st.success(st.session_state.remito_generado_msg)
 
             # Mensaje de éxito fuera de las columnas (ocupa todo el ancho)
             if st.session_state.remito_saved and not st.session_state.get('success_shown', False):
@@ -633,6 +749,9 @@ def remitos_ventas():
     <script>
         (function() {{
             const doc = window.parent.document;
+            if (doc && doc.documentElement) {{
+                doc.documentElement.lang = 'es';
+            }}
 
             if (window.parent._selectHandler) {{
                 doc.removeEventListener('focusin', window.parent._selectHandler, true);
@@ -644,6 +763,7 @@ def remitos_ventas():
 
             function doSelect(el) {{
                 if (!el || doc.activeElement !== el) return;
+                if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'button' || el.type === 'submit') return;
                 try {{
                     if (typeof el.select === 'function') {{
                         el.select();
@@ -654,9 +774,6 @@ def remitos_ventas():
                         el.setSelectionRange(0, el.value.length);
                     }}
                 }} catch(e2) {{}}
-                try {{
-                    doc.execCommand('selectAll', false, null);
-                }} catch(e3) {{}}
             }}
 
             window.parent._selectHandler = function(e) {{
@@ -664,6 +781,7 @@ def remitos_ventas():
                 if (!target) return;
                 const tag = (target.tagName || '').toUpperCase();
                 if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
+                if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'button' || target.type === 'submit') return;
 
                 if (target.dataset.autoSelecting === 'true') return;
                 target.dataset.autoSelecting = 'true';

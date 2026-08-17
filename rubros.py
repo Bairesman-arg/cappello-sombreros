@@ -66,7 +66,9 @@ def rubros_crud():
         st.session_state[input_key] = st.session_state.nombre_rubro_val
 
     # --- Formulario ---
-    st.header("ABM de Rubros")
+    st.header("Gestión de Rubros")
+    if st.session_state.view_grilla:
+        st.markdown(f"`Seleccione la primera columna de la grilla inferior para modificar o eliminar`")
     
     # Campo de texto a todo el ancho (alineado con la botonera)
     nombre_rubro_input = st.text_input(
@@ -82,13 +84,13 @@ def rubros_crud():
     modo_edicion = st.session_state.selected_rubro_id is not None
 
     with col_b1:
-        add_clicked = st.button("Agregar Rubro ➕", use_container_width=True, disabled=modo_edicion)
+        add_clicked = st.button("Agregar Rubro ➕", width="stretch", disabled=modo_edicion)
     with col_b2:
-        mod_clicked = st.button("Modificar Rubro ✍️", use_container_width=True, disabled=not modo_edicion)
+        mod_clicked = st.button("Modificar Rubro ✍️", width="stretch", disabled=not modo_edicion)
     with col_b3:
-        del_clicked = st.button("Eliminar Rubro 🗑️", use_container_width=True, disabled=not modo_edicion)
+        del_clicked = st.button("Eliminar Rubro 🗑️", width="stretch", disabled=not modo_edicion)
     with col_b4:
-        clear_clicked = st.button("Limpiar Formulario 🧹", use_container_width=True)
+        clear_clicked = st.button("Limpiar Formulario 🧹", width="stretch")
 
     if clear_clicked:
         clear_inputs()
@@ -144,7 +146,7 @@ def rubros_crud():
         st.warning(f"¿Está seguro que desea eliminar el rubro ID {st.session_state.selected_rubro_id}?")
         col_c1, col_c2, _ = st.columns([1, 1, 2], gap="small")
         with col_c1:
-            if st.button("Sí, eliminar ⚠️", use_container_width=True):
+            if st.button("Sí, eliminar ⚠️", width="stretch"):
                 try:
                     rubro_id_del = st.session_state.selected_rubro_id
                     delete_existing_rubro(rubro_id_del)
@@ -158,7 +160,7 @@ def rubros_crud():
                     set_status_message(f"❌ Error al eliminar el rubro: {e}", "error")
                     st.rerun()
         with col_c2:
-            if st.button("Cancelar ❌", use_container_width=True):
+            if st.button("Cancelar ❌", width="stretch"):
                 st.session_state.show_delete_modal_rubro = False
                 clear_status_message()
                 st.rerun()
@@ -178,7 +180,33 @@ def rubros_crud():
     total_rubros = len(rubros_df)
 
     if st.session_state.view_grilla:
-        st.header(f"Maestro de Rubros ({total_rubros} totales)")
+        st.markdown(
+            """
+            <style>
+            div[data-testid="stElementContainer"]:has(button[key*="btn_excel"]),
+            div.stButton:has(button[key*="btn_excel"]) {
+                display: flex !important;
+                width: 100% !important;
+            }
+            button[key*="btn_excel"] {
+                height: 38px !important;
+                min-height: 38px !important;
+                font-size: 0.82rem !important;
+                padding: 0px 10px !important;
+                line-height: 1 !important;
+                border-radius: 4px !important;
+                width: 100% !important;
+            }
+            button[key*="btn_excel"] p {
+                font-size: 0.82rem !important;
+                line-height: 1 !important;
+                margin: 0 !important;
+                white-space: nowrap !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
         if not rubros_df.empty:
             df_to_show = rubros_df.copy()
@@ -186,10 +214,20 @@ def rubros_crud():
             if 'fecha_mod' in df_to_show.columns:
                 df_to_show['fecha_mod'] = pd.to_datetime(df_to_show['fecha_mod']).dt.strftime('%Y-%m-%d %H:%M:%S')
 
+            col_ex1, col_ex2 = st.columns([3, 1], gap="small", vertical_alignment="bottom")
+            with col_ex2:
+                if st.button("📊 Enviar a Excel", key="btn_excel_rubros", width="stretch", help="Seleccionar carpeta y guardar datos de la grilla en Excel (.xlsx)"):
+                    config.save_excel_with_folder_dialog(rubros_df, "Rubros", drop_cols=['Seleccionado'])
+
+            if st.session_state.get('excel_saved_msg_Rubros'):
+                st.success(st.session_state.pop('excel_saved_msg_Rubros'))
+
+            st.subheader(f"Maestro de Rubros ({total_rubros} totales)")
+
             edited_df = st.data_editor(
                 df_to_show,
                 key=f"rubros_grid_{st.session_state.grid_version}",
-                use_container_width=True,
+                width="stretch",
                 height=390,
                 hide_index=True,
                 disabled=['id', 'nombre_rubro', 'fecha_mod'],

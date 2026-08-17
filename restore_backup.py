@@ -126,8 +126,10 @@ DB_URL = "postgresql://usuario:contraseña@servidor:puerto/basededatos"
         if not confirm_delete:
             st.error("⚠️ Debe confirmar la eliminación de datos para continuar")
         else:
-            if st.button("🚀 INICIAR RESTAURACIÓN", type="primary", use_container_width=True):
+            if st.button("🚀 INICIAR RESTAURACIÓN", type="primary", width="stretch"):
                 restore_database(uploaded_file, db_url, restore_option)
+
+    st.markdown(f"`{config.FOOTER_APP}`")
 
 def restore_database(uploaded_file, db_url, restore_option):
     """Ejecuta el proceso de restauración"""
@@ -290,7 +292,7 @@ def restore_database(uploaded_file, db_url, restore_option):
         st.success("### 🎉 ¡Restauración Completada Exitosamente!")
         
         st.markdown("### 📊 Verificación de Tablas:")
-        st.dataframe(df_verification, use_container_width=True, hide_index=True)
+        st.dataframe(df_verification, width="stretch", hide_index=True)
         
         # Resumen
         total_records = sum(

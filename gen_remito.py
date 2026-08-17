@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 from openpyxl import load_workbook
 from models import get_remito_completo
+import config
 
 def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     """
@@ -191,9 +192,11 @@ def process_generate_remito(remito_id: int, is_retiro: bool = False, default_dir
         selected_folder = select_folder_native(default_dir=default_dir)
         if selected_folder:
             saved_path = save_remito_to_custom_folder(remito_id, selected_folder, is_retiro=is_retiro)
-            return True, saved_path, selected_folder
+            display_path = config.format_display_path(saved_path)
+            return True, display_path, selected_folder
         else:
             return False, "Operación cancelada por el usuario.", None
     else:
         target_path = save_remito_to_desktop(remito_id, is_retiro=is_retiro)
-        return True, target_path, None
+        display_path = config.format_display_path(target_path)
+        return True, display_path, None

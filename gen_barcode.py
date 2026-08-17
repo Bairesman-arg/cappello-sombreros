@@ -258,7 +258,7 @@ def gen_barcode():
                 st.subheader("Código de barras:")
                 barcode_image = generate_barcode(selected_code_only)
                 if barcode_image:
-                    st.image(barcode_image, caption=f"Código: {selected_code_only}", use_container_width=True)
+                    st.image(barcode_image, caption=f"Código: {selected_code_only}", width="stretch")
             
             st.subheader("Opciones de Impresión")
             

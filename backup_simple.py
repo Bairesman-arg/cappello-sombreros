@@ -71,15 +71,51 @@ DB_URL = "postgresql://usuario:contraseña@servidor:puerto/basededatos"
         """)
         return
     
-    col1, col2 = st.columns([1, 1])
+    has_backup = st.session_state.backup_result is not None
+    b_res = st.session_state.backup_result
+
+    col1, col2, col3 = st.columns([1, 1, 1], gap="small")
     
     with col1:
-        st.markdown("### 📊 Estado de la Base de Datos")
-        verificar_estado = st.button("🔍 Verificar Estado", use_container_width=True)
+        st.markdown("### 📊 Base de Datos")
+        verificar_estado = st.button("🔍 Verificar Estado", width="stretch", key="btn_verificar_estado")
     
     with col2:
         st.markdown("### 🚀 Crear Backup")
-        ejecutar_backup = st.button("💾 Ejecutar Backup", type="primary", use_container_width=True)
+        ejecutar_backup = st.button(
+            "💾 Ejecutar Backup", 
+            type="primary" if not has_backup else "secondary", 
+            width="stretch", 
+            disabled=has_backup,
+            key="btn_ejecutar_backup"
+        )
+
+    btn_download_clicked = False
+    with col3:
+        st.markdown("### 📁 Descargar Backup")
+        if not has_backup:
+            st.button("📁 Seleccionar Carpeta y Guardar Backup", width="stretch", disabled=True, key="btn_save_folder_disabled")
+        else:
+            if is_local_app():
+                btn_download_clicked = st.button(
+                    "📁 Seleccionar Carpeta y Guardar Backup", 
+                    type="primary", 
+                    width="stretch", 
+                    key="btn_save_folder_active"
+                )
+            else:
+                web_download_clicked = st.download_button(
+                    label="📁 Seleccionar Carpeta y Guardar Backup",
+                    data=b_res['bytes'],
+                    file_name=b_res['filename'],
+                    mime="application/zip",
+                    width="stretch",
+                    key="btn_download_web_active"
+                )
+                if web_download_clicked:
+                    st.session_state.backup_saved_msg = f"🎉 ¡Backup **{b_res['filename']}** descargado exitosamente por el navegador!"
+                    st.session_state.backup_result = None
+                    st.rerun()
     
     # Procesar acciones
     if verificar_estado:
@@ -93,49 +129,31 @@ DB_URL = "postgresql://usuario:contraseña@servidor:puerto/basededatos"
         st.markdown("---")
         create_backup(db_url)
 
-    # Si hay un resultado de backup en sesión, mostrar la sección de guardado/descarga de forma persistente
-    if st.session_state.backup_result and not ejecutar_backup:
-        st.markdown("---")
-        b_res = st.session_state.backup_result
-        st.info(f"📦 Tamaño del backup: {b_res['size_mb']:.2f} MB")
-        
-        if is_local_app():
-            col_save1, col_save2 = st.columns(2, gap="small")
-            with col_save1:
-                if st.button("📁 Seleccionar Carpeta y Guardar Backup", type="primary", use_container_width=True, key="btn_save_folder"):
-                    chosen_folder = select_backup_folder()
-                    if chosen_folder:
-                        destination_path = os.path.join(chosen_folder, b_res['filename'])
-                        try:
-                            with open(destination_path, "wb") as f_out:
-                                f_out.write(b_res['bytes'])
-                            st.session_state.backup_saved_msg = f"🎉 ¡Backup guardado exitosamente en: **{destination_path}**!"
-                            st.rerun()
-                        except Exception as err_save:
-                            st.error(f"❌ Error al guardar el archivo: {err_save}")
-                    else:
-                        st.warning("⚠️ No se seleccionó ninguna carpeta.")
-            with col_save2:
-                st.download_button(
-                    label="📥 Descargar por Navegador (.zip)",
-                    data=b_res['bytes'],
-                    file_name=b_res['filename'],
-                    mime="application/zip",
-                    use_container_width=True,
-                    key="btn_download_browser"
-                )
+    if btn_download_clicked and has_backup and is_local_app():
+        chosen_folder = select_backup_folder()
+        if chosen_folder:
+            destination_path = os.path.join(chosen_folder, b_res['filename'])
+            try:
+                with open(destination_path, "wb") as f_out:
+                    f_out.write(b_res['bytes'])
+                display_path = config.format_display_path(destination_path)
+                st.session_state.backup_saved_msg = f"🎉 ¡Backup guardado exitosamente en: **{display_path}**!"
+                st.session_state.backup_result = None  # Regresar botones a estado inicial
+                st.rerun()
+            except Exception as err_save:
+                st.error(f"❌ Error al guardar el archivo: {err_save}")
         else:
-            st.download_button(
-                label="📥 DESCARGAR BACKUP COMPLETO (.zip)",
-                data=b_res['bytes'],
-                file_name=b_res['filename'],
-                mime="application/zip",
-                use_container_width=True,
-                key="btn_download_full"
-            )
+            st.warning("⚠️ No se seleccionó ninguna carpeta.")
 
-        if st.session_state.get('backup_saved_msg'):
-            st.success(st.session_state.backup_saved_msg)
+    # Mensaje de éxito de guardado (persistente)
+    if st.session_state.get('backup_saved_msg'):
+        st.markdown("---")
+        st.success(st.session_state.backup_saved_msg)
+
+    # Si hay un resultado de backup activo en sesión, mostrar la información de tamaño y detalles
+    if has_backup and not ejecutar_backup:
+        st.markdown("---")
+        st.info(f"📦 Tamaño del backup: {b_res['size_mb']:.2f} MB")
 
         # Info detallada
         with st.expander("📋 Detalles del Backup", expanded=True):
@@ -167,6 +185,8 @@ DB_URL = "postgresql://usuario:contraseña@servidor:puerto/basededatos"
         💡 **Tip:** El archivo README.txt dentro del ZIP tiene instrucciones detalladas para recuperar los datos.
         """)
 
+    st.markdown(f"`{config.FOOTER_APP}`")
+
 def check_database_status(db_url):
     """Verifica el estado de las tablas"""
     try:
@@ -195,7 +215,7 @@ def check_database_status(db_url):
                         })
                 
                 df = pd.DataFrame(stats)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width="stretch", hide_index=True)
                 
                 # Resumen
                 total_tables = len(stats)
@@ -360,7 +380,7 @@ def create_backup(db_url):
         
         # Crear directorio temporal
         temp_dir = tempfile.mkdtemp()
-        backup_name = f"capello_backup_{timestamp}"
+        backup_name = f"#Sistema_Capello_BKP_{timestamp}"
         backup_dir = os.path.join(temp_dir, backup_name)
         os.makedirs(backup_dir)
         
