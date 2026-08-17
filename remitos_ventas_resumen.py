@@ -89,10 +89,16 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         # Congelar/fijar la primera columna "Art." como índice fijo al desplazar horizontalmente
         resumen_df.set_index("Art.", inplace=True)
 
+        column_cfg = {
+            col: st.column_config.Column(disabled=True)
+            for col in resumen_df.columns
+        }
+
         st.dataframe(
             resumen_df,
             use_container_width=True,
-            hide_index=False
+            hide_index=False,
+            column_config=column_cfg
         )
     else:
         st.warning("⚠️ No hay artículos cargados en el remito.")
@@ -126,7 +132,11 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         "Devueltos": t_dev,
         "Vendidos": t_vend
     }])
-    st.dataframe(totales_df, use_container_width=True, hide_index=True)
+    totales_column_cfg = {
+        col: st.column_config.Column(disabled=True)
+        for col in totales_df.columns
+    }
+    st.dataframe(totales_df, use_container_width=True, hide_index=True, column_config=totales_column_cfg)
 
     # Utilidad Estimada debajo de la grilla
     st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")

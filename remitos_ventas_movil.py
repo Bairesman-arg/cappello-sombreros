@@ -103,7 +103,7 @@ def remitos_ventas_movil():
     st.header("📱 Recepción Móvil")
     st.markdown(
         '<div style="font-size: 0.8rem; color: #00E676; font-weight: 500; margin-top: -0.4rem; margin-bottom: 0.8rem;">'
-        'Recuerde Actualizar los Datos del Remito si hace modificaciones.</div>',
+        'Recuerde Actualizar los Datos del Remito si modificas.</div>',
         unsafe_allow_html=True
     )
 
