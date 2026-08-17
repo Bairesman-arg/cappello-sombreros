@@ -19,9 +19,19 @@ def remitos_ventas_movil():
     except Exception:
         pass
 
-    # CSS de optimización móvil (Touch friendly)
+    # CSS de optimización móvil (Touch friendly & Sidebar Hidden)
     st.markdown("""
     <style>
+    /* Ocultar sidebar principal para vista móvil limpia a pantalla completa */
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    [data-testid="stSidebarCollapseButton"] {
+        display: none !important;
+    }
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
     /* Estilos responsive y botones grandes para celulares */
     .stButton button {
         min-height: 48px !important;

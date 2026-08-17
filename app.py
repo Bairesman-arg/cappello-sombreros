@@ -34,6 +34,12 @@ def whereami():
 RUTASCRIPT = whereami()
 
 def app():
+    # Redirección temprana a vista móvil sin sidebar si la URL es /carga_movil o ?page=carga_movil
+    if st.query_params.get("page") == "carga_movil":
+        from remitos_ventas_movil import remitos_ventas_movil
+        remitos_ventas_movil()
+        return
+
     # Inyectar idioma español en el documento principal para tooltips nativos del navegador en TODO el sistema
     st.components.v1.html(
         """
