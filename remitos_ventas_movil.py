@@ -14,6 +14,11 @@ def clear_item_inputs_rec_movil():
     st.session_state.articulo_selectbox_rec_movil = None
 
 def remitos_ventas_movil():
+    try:
+        st.set_page_config(page_title="Recepción Móvil - Capello Sombreros", layout="wide", initial_sidebar_state="collapsed")
+    except Exception:
+        pass
+
     # CSS de optimización móvil (Touch friendly)
     st.markdown("""
     <style>

@@ -12,5 +12,4 @@ if 'dbinitialized' not in st.session_state:
 
 from remitos_ventas_movil import remitos_ventas_movil
 
-if __name__ == "__main__":
-    remitos_ventas_movil()
+remitos_ventas_movil()

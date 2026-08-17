@@ -150,7 +150,7 @@ def app():
             rem_ent.remitos_entregas()
         elif submenu == "Recepciones":
             remitos_ventas()
-        elif submenu == "Carga Móvil 📱":
+        elif submenu == "Carga Móvil":
             from remitos_ventas_movil import remitos_ventas_movil
             remitos_ventas_movil()
         elif submenu == "Anulaciones":
