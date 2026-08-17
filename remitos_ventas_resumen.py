@@ -97,8 +97,6 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
     else:
         st.warning("⚠️ No hay artículos cargados en el remito.")
 
-    st.divider()
-
     # --- Totales (Grilla y Utilidad Estimada debajo) ---
     st.subheader("Totales")
     if not df_items.empty:

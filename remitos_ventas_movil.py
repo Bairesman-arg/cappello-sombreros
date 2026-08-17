@@ -304,7 +304,6 @@ def remitos_ventas_movil():
                             st.rerun()
 
             # --- Checkbox Recepción en el Día ---
-            st.divider()
             c_check, c_space = st.columns([3, 1])
             with c_check:
                 st.checkbox("Recepción en el Día", key=f"recepcion_el_dia_{remito_id}", disabled=st.session_state.is_form_disabled_movil)
@@ -350,7 +349,11 @@ def remitos_ventas_movil():
                         df_items.loc[idx, 'devueltos'] = new_dev
                     with c_v:
                         vend_item = max(0, new_entreg - new_dev)
-                        st.metric(f"Vendidos ({nro_art}):", vend_item)
+                        st.markdown(
+                            f'<div style="font-size: 1rem; font-weight: 600; margin-top: 1.8rem; color: #ffffff;">'
+                            f'Vendidos({nro_art}): &nbsp;<span style="font-size: 1.2rem; font-weight: 700; color: #00E676;">{vend_item}</span></div>',
+                            unsafe_allow_html=True
+                        )
 
                     new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                     df_items.loc[idx, 'observaciones'] = new_obs_item
@@ -377,7 +380,8 @@ def remitos_ventas_movil():
                                 st.session_state.pop(f"confirm_del_{remito_id}_{idx}", None)
                                 st.rerun()
 
-                    st.divider()
+                    if idx != df_items.index[-1]:
+                        st.divider()
 
                 items_invalidos = df_items[df_items["devueltos"] > df_items["entregados"]]
                 items_precio_invalidos = df_items[df_items["precio_real"].isna() | (df_items["precio_real"] <= 0)]
@@ -440,14 +444,17 @@ def remitos_ventas_movil():
                 t_ent = t_dev = t_vend = 0
                 t_util = 0.0
 
-            st.subheader("Totales y Utilidad")
-            col_t1, col_t2 = st.columns(2)
-            with col_t1:
-                st.metric("Total Entregados", t_ent)
-                st.metric("Total Devueltos", t_dev)
-            with col_t2:
-                st.metric("Total Vendidos", t_vend)
-                st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
+            # --- Totales (Grilla y Utilidad Estimada debajo) ---
+            st.subheader("Totales")
+
+            totales_df = pd.DataFrame([{
+                "Entregados": t_ent,
+                "Devueltos": t_dev,
+                "Vendidos": t_vend
+            }])
+            st.dataframe(totales_df, use_container_width=True, hide_index=True)
+
+            st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
 
             # === Acciones Principales ===
             st.subheader("Acciones del Remito")
