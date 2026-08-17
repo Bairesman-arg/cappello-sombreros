@@ -56,7 +56,7 @@ def remitos_ventas_movil():
     </style>
     """, unsafe_allow_html=True)
 
-    st.title("CAPPELLO 1.0.51")
+    st.title("Cappello 1.0.51")
     st.header("📱 Recepción Móvil")
 
     # Inicialización de variables de estado
@@ -133,13 +133,15 @@ def remitos_ventas_movil():
             else:
                 st.session_state["carga_exitosa_movil"] = False
 
+    remito_cargado = "remito_activo_rec_movil" in st.session_state and bool(st.session_state.get("carga_exitosa_movil"))
+
     st.number_input(
         "Ingrese o seleccione el Número de Remito:",
         min_value=1,
         step=1,
         key="input_remito_rec_movil",
         on_change=cargar_remito_auto_movil,
-        disabled=st.session_state.is_form_disabled_movil
+        disabled=st.session_state.is_form_disabled_movil or remito_cargado
     )
 
     if st.session_state.get("carga_exitosa_movil") == False:
@@ -201,8 +203,8 @@ def remitos_ventas_movil():
                 disabled=st.session_state.is_form_disabled_movil
             )
 
-            # === Carga / Modificación ===
-            st.subheader("Carga / Modificación")
+            # === Nuevo Artículo o Eliminación ===
+            st.subheader("Nuevo Artículo o Eliminación")
             articulo_options_full = st.session_state.articulos_df.apply(
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
