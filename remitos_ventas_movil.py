@@ -218,7 +218,7 @@ def remitos_ventas_movil():
     if remito_cargado:
         col_btn_top1, col_btn_top2 = st.columns(2)
         with col_btn_top1:
-            if st.button("Seleccionar Otro Remito", key="btn_sel_otro_top_movil", type="secondary", width="stretch", disabled=st.session_state.show_confirm_modal_movil):
+            if st.button("Seleccionar Otro", key="btn_sel_otro_top_movil", type="secondary", width="stretch", disabled=st.session_state.show_confirm_modal_movil):
                 st.session_state.should_reset_all_movil = True
                 st.rerun()
         with col_btn_top2:
@@ -392,6 +392,7 @@ def remitos_ventas_movil():
                             st.session_state[items_key] = pd.concat([st.session_state[items_key], new_row], ignore_index=True)
                             st.session_state.remito_saved_movil = False
                             st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
+                            clear_item_inputs_rec_movil()
                             st.rerun()
 
             # --- Checkbox Recepción en el Día ---
@@ -428,25 +429,25 @@ def remitos_ventas_movil():
                     # Controles completos de edición por artículo (Entregados/Devueltos en Línea 1, Precio Real/Obs en Línea 2)
                     c_ent, c_dev = st.columns(2)
                     with c_ent:
-                        new_entreg = st.number_input(f"Entregados ({nro_art}):", min_value=1, step=1, value=entreg, key=f"entreg_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        new_entreg = st.number_input("Entregados:", min_value=1, step=1, value=entreg, key=f"entreg_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'entregados'] = new_entreg
                     with c_dev:
-                        new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        new_dev = st.number_input("Devueltos:", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'devueltos'] = new_dev
 
                     c_pr, c_obs = st.columns(2)
                     with c_pr:
-                        new_p_real = st.number_input(f"Precio Real ({nro_art}):", min_value=0.0, step=500.0, value=p_real, key=f"p_real_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        new_p_real = st.number_input("Precio Real:", min_value=0.0, step=500.0, value=p_real, key=f"p_real_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'precio_real'] = new_p_real
                     with c_obs:
-                        new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        new_obs_item = st.text_input("Observaciones:", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'observaciones'] = new_obs_item
 
                     # Línea de Vendidos a continuación de Observaciones
                     vend_item = max(0, new_entreg - new_dev)
                     st.markdown(
                         f'<div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-top: 0.4rem; margin-bottom: 0.6rem;">'
-                        f'Vendidos({nro_art}): {vend_item}</div>',
+                        f'Vendidos: {vend_item}</div>',
                         unsafe_allow_html=True
                     )
 
