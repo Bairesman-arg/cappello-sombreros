@@ -88,7 +88,7 @@ def app():
 
         # Control de estado de navegación
         if 'currentpage' not in st.session_state:
-            st.session_state.currentpage = 'Codigos de Barra'  # valor por defecto
+            st.session_state.currentpage = 'Codigos de Barra'
 
         # MENÚ PRINCIPAL - Incluye Rubros, Informes y Backup
         mainmenu = option_menu(menu_title=None,
@@ -98,34 +98,30 @@ def app():
                                default_index=0,
                                key="main_menu_nav")
 
-        # Detectar cambio de página
+        # Detectar cambio de página y forzar actualización limpia del submenú
         if mainmenu != st.session_state.currentpage:
-            # Limpiar variables en session_state que puedan contener datos viejos
-            claves_a_limpiar = [
-                'clientes_df',
-                'articulos_df',
-                'backup_manager'
-            ]
-            for clave in claves_a_limpiar:
+            st.session_state.currentpage = mainmenu
+            st.session_state.menu_change_counter = st.session_state.get("menu_change_counter", 0) + 1
+            for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
                 if clave in st.session_state:
                     del st.session_state[clave]
+            st.rerun()
 
-            # Actualizar la página actual en session_state
-            st.session_state.currentpage = mainmenu
+        menu_counter = st.session_state.get("menu_change_counter", 0)
 
         if mainmenu == "Remitos":
             submenu = option_menu(menu_title="Remitos",
                                   options=["Entregas", "Recepciones", "Carga Móvil", "Anulaciones"],
                                   icons=["file-earmark-plus", "file-earmark-plus", "phone", "file-earmark-plus"],
                                   menu_icon="folder", default_index=0, orientation="vertical",
-                                  key="remitos_submenu_nav")
+                                  key=f"remitos_submenu_nav_{menu_counter}")
 
         elif mainmenu == "Articulos":
             submenu = option_menu(menu_title="Articulos",
                                   options=["ABM Articulos", "Cargar Novedades"],
                                   icons=["file-earmark-plus", "file-earmark-plus"],
                                   menu_icon="folder", default_index=0, orientation="vertical",
-                                  key="articulos_submenu_nav")
+                                  key=f"articulos_submenu_nav_{menu_counter}")
         
         elif mainmenu == "Backup":
             submenu = option_menu(menu_title="Backup",
@@ -134,7 +130,7 @@ def app():
                                   menu_icon="shield-check", 
                                   default_index=0, 
                                   orientation="vertical",
-                                  key="backup_submenu_nav")
+                                  key=f"backup_submenu_nav_{menu_counter}")
         else:
             submenu = None
 
