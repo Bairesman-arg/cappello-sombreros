@@ -56,7 +56,7 @@ def remitos_ventas_movil():
     </style>
     """, unsafe_allow_html=True)
 
-    st.title("Cappello 1.0.51")
+    st.title(f"Capello {config.VERSION}")
     st.header("📱 Recepción Móvil")
 
     # Inicialización de variables de estado
@@ -203,8 +203,8 @@ def remitos_ventas_movil():
                 disabled=st.session_state.is_form_disabled_movil
             )
 
-            # === Nuevo Artículo o Eliminación ===
-            st.subheader("Nuevo Artículo o Eliminación")
+            # === Alta o Baja de Art. ===
+            st.subheader("Alta o Baja de Art.")
             articulo_options_full = st.session_state.articulos_df.apply(
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
@@ -351,9 +351,30 @@ def remitos_ventas_movil():
                     with c_v:
                         vend_item = max(0, new_entreg - new_dev)
                         st.metric(f"Vendidos ({nro_art}):", vend_item)
+                        if st.button("Eliminar", key=f"btn_del_card_{remito_id}_{idx}", width="stretch", disabled=st.session_state.is_form_disabled_movil):
+                            st.session_state[f"confirm_del_{remito_id}_{idx}"] = True
+                            st.rerun()
 
                     new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                     df_items.loc[idx, 'observaciones'] = new_obs_item
+
+                    # Confirmación de eliminación por artículo
+                    if st.session_state.get(f"confirm_del_{remito_id}_{idx}", False):
+                        st.warning(f"¿Confirma la eliminación del artículo Art. {nro_art} - {desc}?")
+                        c_conf1, c_conf2 = st.columns(2)
+                        with c_conf1:
+                            if st.button("Eliminar", key=f"do_del_{remito_id}_{idx}", type="primary", width="stretch"):
+                                st.session_state[items_key] = st.session_state[items_key][
+                                    st.session_state[items_key]['nro_articulo'] != nro_art
+                                ].reset_index(drop=True)
+                                st.session_state.remito_saved_movil = False
+                                st.session_state.pop(f"confirm_del_{remito_id}_{idx}", None)
+                                st.rerun()
+                        with c_conf2:
+                            if st.button("Cancelar", key=f"cancel_del_{remito_id}_{idx}", width="stretch"):
+                                st.session_state.pop(f"confirm_del_{remito_id}_{idx}", None)
+                                st.rerun()
+
                     st.divider()
 
                 items_invalidos = df_items[df_items["devueltos"] > df_items["entregados"]]
