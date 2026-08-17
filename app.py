@@ -97,11 +97,10 @@ def app():
             # Actualizar la página actual en session_state
             st.session_state.currentpage = mainmenu
 
-        # Submenús
         if mainmenu == "Remitos":
             submenu = option_menu(menu_title="Remitos",
-                                  options=["Entregas", "Recepciones", "Anulaciones"],
-                                  icons=["file-earmark-plus", "file-earmark-plus", "file-earmark-plus"],
+                                  options=["Entregas", "Recepciones", "Carga Móvil", "Anulaciones"],
+                                  icons=["file-earmark-plus", "file-earmark-plus", "phone", "file-earmark-plus"],
                                   menu_icon="folder", default_index=0, orientation="vertical",
                                   key="remitos_submenu_nav")
 
@@ -122,6 +121,12 @@ def app():
                                   key="backup_submenu_nav")
         else:
             submenu = None
+
+    # Redirección por URL directa de parámetro ?page=carga_movil
+    if st.query_params.get("page") == "carga_movil":
+        from remitos_ventas_movil import remitos_ventas_movil
+        remitos_ventas_movil()
+        return
 
     # Lógica para renderizar contenido según menú y submenú
     if mainmenu == "Codigos de Barra":
@@ -145,6 +150,9 @@ def app():
             rem_ent.remitos_entregas()
         elif submenu == "Recepciones":
             remitos_ventas()
+        elif submenu == "Carga Móvil 📱":
+            from remitos_ventas_movil import remitos_ventas_movil
+            remitos_ventas_movil()
         elif submenu == "Anulaciones":
             remitos_anulaciones()
 
