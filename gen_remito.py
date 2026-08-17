@@ -33,13 +33,16 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     ws["A6"] = f"{cab['direccion'] or ''} - {cab['localidad'] or ''}"
     ws["G6"] = cab["telefono"] or ""
     if not is_retiro:  # Solo cuando se genera el Remito (1ra. vez)
-        ws["H2"] = cab["porc_dto"] / 100 if cab["porc_dto"] else 1
+        ws["H2"] = (1.0 - (float(cab["porc_dto"]) / 100.0)) if cab.get("porc_dto") else 1.0
+    else:
+        ws["H2"] = (1.0 - (float(cab["porc_dto"]) / 100.0)) if cab.get("porc_dto") else 1.0
 
     # --- Items ---
     base_row = 10
     for i, row in items.iterrows():
         ws[f"A{base_row+i}"] = row["nro_articulo"]
         ws[f"B{base_row+i}"] = row["descripcion"]
+        # Columna C utiliza la fórmula nativa de la plantilla Excel: =IF(D10 ="","",D10*$H$2)
         ws[f"D{base_row+i}"] = float(row["precio_real"])
         ws[f"E{base_row+i}"] = int(row["entregados"])
         if is_retiro:

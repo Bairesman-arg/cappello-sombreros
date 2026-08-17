@@ -475,12 +475,15 @@ def get_remito_completo(remito_id: int):
 
         # --- Items ---
         items = pd.read_sql(text("""
-            SELECT a.id AS id_articulo, a.nro_articulo, a.descripcion, COALESCE(ri.precio_real_item, a.precio_real, 0) AS precio_real, 
-                    COALESCE(a.costo, 0) AS costo,
-                    ri.entregados, ri.devueltos, COALESCE(ri.observaciones_item, '') AS observaciones
+            SELECT a.id AS id_articulo, a.nro_articulo, a.descripcion,
+                   COALESCE(a.precio_publico, 0) AS precio_publico,
+                   COALESCE(ri.precio_real_item, a.precio_real, 0) AS precio_real, 
+                   COALESCE(a.costo, 0) AS costo,
+                   ri.entregados, ri.devueltos, COALESCE(ri.observaciones_item, '') AS observaciones
             FROM remito_items ri
             JOIN articulos a ON ri.articulo_id = a.id
             WHERE ri.remito_id = :rid
+            ORDER BY ri.id ASC
         """), conn, params={"rid": remito_id})
 
     return {

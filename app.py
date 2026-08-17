@@ -75,7 +75,10 @@ def app():
                 section[data-testid="stSidebar"] > div {
                     padding-top: 1rem !important;
                 }
-                [data-testid="stSidebarHeader"] {
+                [data-testid="stSidebarHeader"],
+                [data-testid="stSidebarNav"],
+                [data-testid="stSidebarNavItems"],
+                div[data-testid="stSidebarNavSeparator"] {
                     display: none !important;
                 }
             </style>

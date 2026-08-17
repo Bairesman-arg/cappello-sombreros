@@ -58,7 +58,7 @@ def calculate_total_facturar(items_df, cliente_id, porc_dto):
         return "Ingrese el Cliente"
 
     if items_df.empty or 'Precio Real' not in items_df.columns or 'Entregados' not in items_df.columns:
-        return "$0.00"
+        return "$ 0,00"
 
     precios = pd.to_numeric(items_df['Precio Real'], errors='coerce').fillna(0)
     entregados = pd.to_numeric(items_df['Entregados'], errors='coerce').fillna(0)
@@ -67,7 +67,8 @@ def calculate_total_facturar(items_df, cliente_id, porc_dto):
     factor = 1.0 - (dto_val / 100.0)
 
     total = (precios * entregados).sum() * factor
-    return f"${float(total):.2f}"
+    formatted = f"{float(total):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"$ {formatted}"
 
 def remitos_entregas():
     st.title(config.TITULO_APP)
@@ -421,7 +422,7 @@ def remitos_entregas():
             column_config={
                 "Articulo": st.column_config.Column(width="medium"),
                 "Descripción": st.column_config.Column(width="medium"),
-                "Precio Real": st.column_config.NumberColumn(format="$%.2f", width="small"),
+                "Precio Real": st.column_config.NumberColumn(format="$%,.2f", width="small"),
                 "Entregados": st.column_config.Column(width="small"),
                 "Observaciones": st.column_config.Column(width="small")
             }
