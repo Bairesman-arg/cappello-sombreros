@@ -343,22 +343,21 @@ def remitos_ventas_movil():
                         new_entreg = st.number_input(f"Entregados ({nro_art}):", min_value=1, step=1, value=entreg, key=f"entreg_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'entregados'] = new_entreg
 
-                    c_d, c_v = st.columns(2)
-                    with c_d:
-                        new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
-                        df_items.loc[idx, 'devueltos'] = new_dev
-                    with c_v:
-                        vend_item = max(0, new_entreg - new_dev)
-                        st.markdown(
-                            f'<div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-top: 2.1rem; margin-bottom: 0.5rem;">'
-                            f'Vendidos({nro_art}): {vend_item}</div>',
-                            unsafe_allow_html=True
-                        )
+                    new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                    df_items.loc[idx, 'devueltos'] = new_dev
 
                     new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                     df_items.loc[idx, 'observaciones'] = new_obs_item
 
-                    # Botón Eliminar Artículo a continuación de Observaciones
+                    # Línea de Vendidos a continuación de Observaciones
+                    vend_item = max(0, new_entreg - new_dev)
+                    st.markdown(
+                        f'<div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-top: 0.4rem; margin-bottom: 0.6rem;">'
+                        f'Vendidos({nro_art}): {vend_item}</div>',
+                        unsafe_allow_html=True
+                    )
+
+                    # Botón Eliminar Artículo
                     if st.button("Eliminar Artículo", key=f"btn_del_card_{remito_id}_{idx}", width="stretch", disabled=st.session_state.is_form_disabled_movil):
                         st.session_state[f"confirm_del_{remito_id}_{idx}"] = True
                         st.rerun()
