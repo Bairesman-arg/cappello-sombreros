@@ -148,6 +148,8 @@ def remitos_ventas_movil():
                 st.session_state["carga_exitosa_movil"] = False
 
     remito_cargado = "remito_activo_rec_movil" in st.session_state and bool(st.session_state.get("carga_exitosa_movil"))
+    if remito_cargado:
+        st.session_state["input_remito_rec_movil"] = st.session_state["remito_activo_rec_movil"]
 
     st.number_input(
         "Ingrese o seleccione el Número de Remito:",

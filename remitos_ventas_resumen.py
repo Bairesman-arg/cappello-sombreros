@@ -32,7 +32,7 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
     )
 
     st.title(f"Capello {config.VERSION}")
-    st.header("📄 Remito en Edición")
+    st.header("📄 Resúmen Remito")
 
     # Subtítulo de Cabecera
     razon_social = cab.get("razon_social", "")
@@ -86,10 +86,13 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         resumen_df["Vendidos"] = (df_items["entregados"].astype(int) - df_items["devueltos"].astype(int)).apply(lambda x: max(0, x))
         resumen_df["Observaciones"] = df_items["observaciones"].fillna("").astype(str)
 
+        # Congelar/fijar la primera columna "Art." como índice fijo al desplazar horizontalmente
+        resumen_df.set_index("Art.", inplace=True)
+
         st.dataframe(
             resumen_df,
             use_container_width=True,
-            hide_index=True
+            hide_index=False
         )
     else:
         st.warning("⚠️ No hay artículos cargados en el remito.")
