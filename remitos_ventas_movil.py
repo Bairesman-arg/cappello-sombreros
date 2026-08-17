@@ -350,8 +350,8 @@ def remitos_ventas_movil():
                     with c_v:
                         vend_item = max(0, new_entreg - new_dev)
                         st.markdown(
-                            f'<div style="font-size: 1rem; font-weight: 600; margin-top: 1.8rem; color: #ffffff;">'
-                            f'Vendidos({nro_art}): &nbsp;<span style="font-size: 1.2rem; font-weight: 700; color: #00E676;">{vend_item}</span></div>',
+                            f'<div style="font-size: 0.95rem; font-weight: 600; color: #ffffff; margin-top: 2.1rem; margin-bottom: 0.5rem;">'
+                            f'Vendidos({nro_art}): {vend_item}</div>',
                             unsafe_allow_html=True
                         )
 
