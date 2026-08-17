@@ -34,17 +34,35 @@ def remitos_ventas_movil():
     }
     /* Estilos responsive y botones grandes para celulares */
     .stButton button {
-        min-height: 48px !important;
-        font-size: 1rem !important;
+        min-height: 44px !important;
+        font-size: 0.95rem !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
     }
     .stNumberInput input {
-        font-size: 1.05rem !important;
+        font-size: 0.95rem !important;
+        padding: 0.2rem 0.4rem !important;
+        height: 38px !important;
+        min-height: 38px !important;
         text-align: center !important;
     }
+    div[data-testid="stNumberInput"] label,
+    div[data-testid="stTextInput"] label {
+        font-size: 0.82rem !important;
+        margin-bottom: 0.1rem !important;
+    }
+    div[data-testid="stNumberInput"] button {
+        height: 38px !important;
+        min-height: 38px !important;
+    }
+    div[data-testid="stTextInput"] input {
+        font-size: 0.95rem !important;
+        padding: 0.2rem 0.4rem !important;
+        height: 38px !important;
+        min-height: 38px !important;
+    }
     div[data-testid="stMetricValue"] {
-        font-size: 1.3rem !important;
+        font-size: 1.2rem !important;
     }
     .header-sub-text {
         font-size: 1.05rem;
@@ -160,6 +178,66 @@ def remitos_ventas_movil():
         disabled=st.session_state.is_form_disabled_movil or remito_cargado
     )
 
+    # Si NO hay remito cargado (o recién se abre/reinicia), enfocar y seleccionar automáticamente el texto del input
+    if not remito_cargado:
+        st.components.v1.html(
+            """
+            <script>
+                (function() {
+                    function focusRemitoInput() {
+                        const doc = window.parent.document;
+                        if (!doc) return;
+                        const inputs = doc.querySelectorAll('div[data-testid="stNumberInput"] input');
+                        if (inputs.length > 0) {
+                            const inp = inputs[0];
+                            inp.focus();
+                            inp.select();
+                        }
+                    }
+                    setTimeout(focusRemitoInput, 50);
+                    setTimeout(focusRemitoInput, 200);
+                })();
+            </script>
+            """,
+            height=0,
+        )
+
+    # Botones en la misma línea: "Seleccionar Otro Remito" y "Ver Resúmen" en la cabecera
+    if remito_cargado:
+        col_btn_top1, col_btn_top2 = st.columns(2)
+        with col_btn_top1:
+            if st.button("Seleccionar Otro Remito", key="btn_sel_otro_top_movil", type="secondary", width="stretch", disabled=st.session_state.show_confirm_modal_movil):
+                st.session_state.should_reset_all_movil = True
+                st.rerun()
+        with col_btn_top2:
+            if st.button("Ver Resúmen", key="btn_resumen_top_movil", width="stretch"):
+                st.session_state.show_resumen_movil = True
+                st.components.v1.html(
+                    """
+                    <script>
+                        (function() {
+                            function scrollToTop() {
+                                const doc = window.parent.document;
+                                if (!doc) return;
+                                const el = doc.getElementById('resumen_top_anchor');
+                                if (el) {
+                                    el.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                }
+                                const containers = doc.querySelectorAll('[data-testid="stMain"], section.main, [data-testid="stAppViewContainer"]');
+                                containers.forEach(c => { c.scrollTop = 0; });
+                                if (doc.documentElement) doc.documentElement.scrollTop = 0;
+                                if (doc.body) doc.body.scrollTop = 0;
+                                window.parent.scrollTo(0, 0);
+                            }
+                            setTimeout(scrollToTop, 10);
+                            setTimeout(scrollToTop, 100);
+                        })();
+                    </script>
+                    """,
+                    height=0,
+                )
+                st.rerun()
+
     if st.session_state.get("carga_exitosa_movil") == False:
         st.error(f"❌ El Remito #{st.session_state.input_remito_rec_movil} no existe.")
 
@@ -199,8 +277,6 @@ def remitos_ventas_movil():
                 fecha_entrega_val = cab.get("fecha_entrega")
                 val_fecha_ret = cab.get("fecha_retiro")
                 if val_fecha_ret and fecha_entrega_val and val_fecha_ret < fecha_entrega_val:
-                    val_fecha_ret = fecha_entrega_val
-                elif not val_fecha_ret and fecha_entrega_val:
                     val_fecha_ret = fecha_entrega_val
 
                 nueva_fecha_retiro = st.date_input(
@@ -265,11 +341,14 @@ def remitos_ventas_movil():
                     st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
 
-            st.number_input("Entregados:", min_value=1, step=1, key="entregados_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
-            st.number_input("Precio Real:", min_value=0.0, step=500.0, key="precio_real_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
+            c_ent_add, c_pr_add = st.columns(2)
+            with c_ent_add:
+                st.number_input("Entregados:", min_value=1, step=1, key="entregados_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
+            with c_pr_add:
+                st.number_input("Precio Real:", min_value=0.0, step=500.0, key="precio_real_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
             st.text_input("Observaciones del Item:", key="observaciones_item_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
 
-            add_clicked = st.button("Agregar Item ➕", width="stretch", disabled=(articulo_sel is None or st.session_state.is_form_disabled_movil))
+            add_clicked = st.button("Agregar Artículo al Remito", width="stretch", disabled=(articulo_sel is None or st.session_state.is_form_disabled_movil))
 
             if add_clicked:
                 rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
@@ -334,20 +413,22 @@ def remitos_ventas_movil():
 
                     st.markdown(f'<div style="font-size: 1.05rem; font-weight: 600; margin-top: 0.4rem; margin-bottom: 0.4rem;">Art. {nro_art} - {desc}</div>', unsafe_allow_html=True)
                     
-                    # Controles completos de edición por artículo (Precio Real, Entregados, Devueltos, Obs)
-                    c_p, c_e = st.columns(2)
-                    with c_p:
-                        new_p_real = st.number_input(f"Precio Real ({nro_art}):", min_value=0.0, step=500.0, value=p_real, key=f"p_real_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
-                        df_items.loc[idx, 'precio_real'] = new_p_real
-                    with c_e:
+                    # Controles completos de edición por artículo (Entregados/Devueltos en Línea 1, Precio Real/Obs en Línea 2)
+                    c_ent, c_dev = st.columns(2)
+                    with c_ent:
                         new_entreg = st.number_input(f"Entregados ({nro_art}):", min_value=1, step=1, value=entreg, key=f"entreg_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'entregados'] = new_entreg
+                    with c_dev:
+                        new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        df_items.loc[idx, 'devueltos'] = new_dev
 
-                    new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
-                    df_items.loc[idx, 'devueltos'] = new_dev
-
-                    new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
-                    df_items.loc[idx, 'observaciones'] = new_obs_item
+                    c_pr, c_obs = st.columns(2)
+                    with c_pr:
+                        new_p_real = st.number_input(f"Precio Real ({nro_art}):", min_value=0.0, step=500.0, value=p_real, key=f"p_real_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        df_items.loc[idx, 'precio_real'] = new_p_real
+                    with c_obs:
+                        new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        df_items.loc[idx, 'observaciones'] = new_obs_item
 
                     # Línea de Vendidos a continuación de Observaciones
                     vend_item = max(0, new_entreg - new_dev)
