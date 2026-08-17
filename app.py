@@ -34,26 +34,33 @@ def whereami():
 RUTASCRIPT = whereami()
 
 def app():
-    # Redirección temprana a vista móvil sin sidebar si la URL es /carga_movil o ?page=carga_movil
-    if st.query_params.get("page") == "carga_movil":
-        from remitos_ventas_movil import remitos_ventas_movil
-        remitos_ventas_movil()
-        return
-
-    # Inyectar idioma español en el documento principal para tooltips nativos del navegador en TODO el sistema
+    # Detectar si la URL contiene /carga_movil en la ruta y forzar ?page=carga_movil
     st.components.v1.html(
         """
         <script>
             (function() {
-                const doc = window.parent.document;
-                if (doc && doc.documentElement) {
-                    doc.documentElement.lang = 'es';
+                const parentDoc = window.parent.document;
+                if (parentDoc && parentDoc.documentElement) {
+                    parentDoc.documentElement.lang = 'es';
+                }
+                const parentUrl = window.parent.location.href;
+                const parentPath = window.parent.location.pathname;
+                if ((parentPath.toLowerCase().includes("carga_movil")) && !parentUrl.includes("page=carga_movil")) {
+                    const searchParams = new URLSearchParams(window.parent.location.search);
+                    searchParams.set("page", "carga_movil");
+                    window.parent.location.search = searchParams.toString();
                 }
             })();
         </script>
         """,
         height=0,
     )
+
+    query_page = str(st.query_params.get("page", "")).lower()
+    if query_page == "carga_movil" or "carga_movil" in st.query_params:
+        from remitos_ventas_movil import remitos_ventas_movil
+        remitos_ventas_movil()
+        return
 
     # Si el programa se ejecuta como un script de Python...
     with st.sidebar:

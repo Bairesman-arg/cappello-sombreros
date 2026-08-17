@@ -10,6 +10,8 @@ if 'dbinitialized' not in st.session_state:
     models.init_db()
     st.session_state.dbinitialized = True
 
+st.query_params["page"] = "carga_movil"
+
 from remitos_ventas_movil import remitos_ventas_movil
 
 remitos_ventas_movil()

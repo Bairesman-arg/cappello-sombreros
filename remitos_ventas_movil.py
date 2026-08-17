@@ -56,7 +56,7 @@ def remitos_ventas_movil():
     </style>
     """, unsafe_allow_html=True)
 
-    st.title(config.TITULO_APP)
+    st.title("CAPPELLO 1.0.51")
     st.header("📱 Recepción Móvil")
 
     # Inicialización de variables de estado
@@ -166,6 +166,8 @@ def remitos_ventas_movil():
 
             if is_recepcion_dia:
                 cab["fecha_retiro"] = None
+                if f"f_ret_m_{remito_id}" in st.session_state:
+                    st.session_state[f"f_ret_m_{remito_id}"] = None
 
             # Fechas y Recepción en el día
             st.date_input("Fecha de Entrega", value=cab["fecha_entrega"], format="DD/MM/YYYY", disabled=True, key=f"f_ent_m_{remito_id}")
