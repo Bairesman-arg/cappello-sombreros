@@ -3,7 +3,7 @@ import pandas as pd
 import config
 
 def remitos_ventas_resumen(remito_id, cab, df_items):
-    """Muestra una vista resumen informativa y no editable del remito en su estado actual."""
+    """Muestra una vista resumen informativa y no editable del remito en su estado actual (Remito en Edición)."""
     st.markdown("<div id='resumen_top_anchor'></div>", unsafe_allow_html=True)
     st.components.v1.html(
         """
@@ -31,7 +31,8 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         height=0,
     )
 
-    st.header("📄 Resumen del Remito")
+    st.title(f"Capello {config.VERSION}")
+    st.header("📄 Remito en Edición")
 
     # Subtítulo de Cabecera
     razon_social = cab.get("razon_social", "")
@@ -54,15 +55,24 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
 
     obs_cabecera = cab.get("observaciones") or ""
 
-    # Información de Cabecera informativa
-    c_f1, c_f2 = st.columns(2)
-    with c_f1:
-        st.info(f"**Fecha de Entrega:** {f_entrega_str}")
-    with c_f2:
-        st.info(f"**Fecha de Retiro:** {f_retiro_str}")
+    # Fichas Informativas de Fechas con Letra Blanca (sin azul st.info)
+    st.markdown(
+        f"""
+        <div style="display: flex; gap: 10px; margin-top: 0.5rem; margin-bottom: 12px;">
+            <div style="flex: 1; background-color: #262730; padding: 10px 14px; border-radius: 8px; border-left: 4px solid #00C853;">
+                <div style="color: #ffffff; font-size: 0.85rem; font-weight: 500;">Fecha de Entrega</div>
+                <div style="color: #ffffff; font-size: 1.05rem; font-weight: 700; margin-top: 2px;">{f_entrega_str}</div>
+            </div>
+            <div style="flex: 1; background-color: #262730; padding: 10px 14px; border-radius: 8px; border-left: 4px solid #FF9800;">
+                <div style="color: #ffffff; font-size: 0.85rem; font-weight: 500;">Fecha de Retiro</div>
+                <div style="color: #ffffff; font-size: 1.05rem; font-weight: 700; margin-top: 2px;">{f_retiro_str if f_retiro_str else "-"}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.markdown(f"**Observaciones del Remito:** {obs_cabecera if obs_cabecera else '*Sin observaciones*'}")
-    st.divider()
 
     # --- Grilla Informativa de Artículos ---
     st.subheader("Detalle de Artículos")
@@ -86,8 +96,8 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
 
     st.divider()
 
-    # --- Grilla / Métricas Informativas de Totales ---
-    st.subheader("Totales y Utilidad Estimada")
+    # --- Totales (Grilla y Utilidad Estimada debajo) ---
+    st.subheader("Totales")
     if not df_items.empty:
         t_ent = int(df_items["entregados"].sum())
         t_dev = int(df_items["devueltos"].sum())
@@ -109,18 +119,19 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         t_ent = t_dev = t_vend = 0
         t_util = 0.0
 
-    col_t1, col_t2 = st.columns(2)
-    with col_t1:
-        st.metric("Total Entregados", t_ent)
-        st.metric("Total Devueltos", t_dev)
-    with col_t2:
-        st.metric("Total Vendidos", t_vend)
-        st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
+    # Grilla de Totales
+    totales_df = pd.DataFrame([{
+        "Entregados": t_ent,
+        "Devueltos": t_dev,
+        "Vendidos": t_vend
+    }])
+    st.dataframe(totales_df, use_container_width=True, hide_index=True)
 
-    st.divider()
+    # Utilidad Estimada debajo de la grilla
+    st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
 
-    # Botón de Cerrar Resumen
-    if st.button("Cerrar Resumen", type="primary", width="stretch"):
+    # Botón de Cerrar Resúmen
+    if st.button("Cerrar Resúmen", type="primary", width="stretch"):
         st.session_state.show_resumen_movil = False
         st.components.v1.html(
             """

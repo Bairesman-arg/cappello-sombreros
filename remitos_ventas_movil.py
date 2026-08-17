@@ -115,7 +115,8 @@ def remitos_ventas_movil():
         st.session_state.input_remito_rec_movil = 1
         st.rerun()
 
-    st.session_state.is_form_disabled_movil = st.session_state.show_confirm_modal_movil or st.session_state.excel_saved_movil
+    has_active_del_confirm = any(k.startswith("confirm_del_") and st.session_state[k] for k in st.session_state)
+    st.session_state.is_form_disabled_movil = st.session_state.show_confirm_modal_movil or st.session_state.excel_saved_movil or has_active_del_confirm
 
     # --- Cargar Remito ---
     def cargar_remito_auto_movil():
@@ -352,8 +353,8 @@ def remitos_ventas_movil():
                     new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                     df_items.loc[idx, 'observaciones'] = new_obs_item
 
-                    # Botón Eliminar a continuación de Observaciones
-                    if st.button("Eliminar", key=f"btn_del_card_{remito_id}_{idx}", width="stretch", disabled=st.session_state.is_form_disabled_movil):
+                    # Botón Eliminar Artículo a continuación de Observaciones
+                    if st.button("Eliminar Artículo", key=f"btn_del_card_{remito_id}_{idx}", width="stretch", disabled=st.session_state.is_form_disabled_movil):
                         st.session_state[f"confirm_del_{remito_id}_{idx}"] = True
                         st.rerun()
 
@@ -362,7 +363,7 @@ def remitos_ventas_movil():
                         st.warning(f"¿Confirma la eliminación del artículo Art. {nro_art} - {desc}?")
                         c_conf1, c_conf2 = st.columns(2)
                         with c_conf1:
-                            if st.button("Eliminar", key=f"do_del_{remito_id}_{idx}", type="primary", width="stretch"):
+                            if st.button("Confirmar Eliminación", key=f"do_del_{remito_id}_{idx}", type="primary", width="stretch"):
                                 st.session_state[items_key] = st.session_state[items_key][
                                     st.session_state[items_key]['nro_articulo'] != nro_art
                                 ].reset_index(drop=True)
