@@ -61,6 +61,18 @@ def remitos_ventas_movil():
         height: 38px !important;
         min-height: 38px !important;
     }
+    /* Impedir que Streamlit colapse las 2 columnas en celulares */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        width: 50% !important;
+        min-width: 0 !important;
+        flex: 1 1 50% !important;
+    }
     div[data-testid="stMetricValue"] {
         font-size: 1.2rem !important;
     }
