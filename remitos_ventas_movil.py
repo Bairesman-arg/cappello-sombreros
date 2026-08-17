@@ -56,6 +56,19 @@ def remitos_ventas_movil():
     </style>
     """, unsafe_allow_html=True)
 
+    # Si el usuario solicitó la vista informativa del resumen, se renderiza arriba de todo a pantalla completa
+    if st.session_state.get("show_resumen_movil", False) and "remito_activo_rec_movil" in st.session_state:
+        remito_id = st.session_state["remito_activo_rec_movil"]
+        cab_key = f"remito_rec_movil_{remito_id}_cab"
+        items_key = f"remito_rec_movil_{remito_id}_items"
+        if cab_key in st.session_state and items_key in st.session_state:
+            cab = st.session_state[cab_key]
+            df_items_curr = st.session_state[items_key]
+            from remitos_ventas_resumen import remitos_ventas_resumen
+            remitos_ventas_resumen(remito_id, cab, df_items_curr)
+            return
+
+    st.markdown("<div id='movil_top_anchor'></div>", unsafe_allow_html=True)
     st.title(f"Capello {config.VERSION}")
     st.header("📱 Recepción Móvil")
 
@@ -203,8 +216,8 @@ def remitos_ventas_movil():
                 disabled=st.session_state.is_form_disabled_movil
             )
 
-            # === Alta o Baja de Art. ===
-            st.subheader("Alta o Baja de Art.")
+            # === Alta de Artículos ===
+            st.subheader("Alta de Artículos")
             articulo_options_full = st.session_state.articulos_df.apply(
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
@@ -253,11 +266,7 @@ def remitos_ventas_movil():
             st.number_input("Precio Real:", min_value=0.0, step=500.0, key="precio_real_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
             st.text_input("Observaciones del Item:", key="observaciones_item_input_rec_movil", disabled=st.session_state.is_form_disabled_movil)
 
-            col_add, col_del = st.columns(2, gap="small")
-            with col_add:
-                add_clicked = st.button("Agregar Item ➕", width="stretch", disabled=(articulo_sel is None or st.session_state.is_form_disabled_movil))
-            with col_del:
-                del_clicked = st.button("Eliminar Item 🗑️", width="stretch", disabled=(articulo_sel is None or st.session_state.is_form_disabled_movil))
+            add_clicked = st.button("Agregar Item ➕", width="stretch", disabled=(articulo_sel is None or st.session_state.is_form_disabled_movil))
 
             if add_clicked:
                 rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
@@ -290,18 +299,6 @@ def remitos_ventas_movil():
                             st.session_state.remito_saved_movil = False
                             st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                             st.rerun()
-
-            if del_clicked:
-                rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
-                if items_key in st.session_state and (st.session_state[items_key].empty or articulo_sel not in st.session_state[items_key]['nro_articulo'].values):
-                    st.warning("⚠️ No puede ser eliminado. Item inexistente en el Remito!")
-                else:
-                    st.session_state[items_key] = st.session_state[items_key][
-                        st.session_state[items_key]['nro_articulo'] != articulo_sel
-                    ].reset_index(drop=True)
-                    st.session_state.remito_saved_movil = False
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
-                    st.rerun()
 
             # --- Checkbox Recepción en el Día ---
             st.divider()
@@ -351,12 +348,14 @@ def remitos_ventas_movil():
                     with c_v:
                         vend_item = max(0, new_entreg - new_dev)
                         st.metric(f"Vendidos ({nro_art}):", vend_item)
-                        if st.button("Eliminar", key=f"btn_del_card_{remito_id}_{idx}", width="stretch", disabled=st.session_state.is_form_disabled_movil):
-                            st.session_state[f"confirm_del_{remito_id}_{idx}"] = True
-                            st.rerun()
 
                     new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                     df_items.loc[idx, 'observaciones'] = new_obs_item
+
+                    # Botón Eliminar a continuación de Observaciones
+                    if st.button("Eliminar", key=f"btn_del_card_{remito_id}_{idx}", width="stretch", disabled=st.session_state.is_form_disabled_movil):
+                        st.session_state[f"confirm_del_{remito_id}_{idx}"] = True
+                        st.rerun()
 
                     # Confirmación de eliminación por artículo
                     if st.session_state.get(f"confirm_del_{remito_id}_{idx}", False):
@@ -452,6 +451,34 @@ def remitos_ventas_movil():
             tiene_errores = df_items.empty or not items_invalidos.empty or not items_precio_invalidos.empty or not items_entregados_invalidos.empty or not items_precio_menor_costo.empty or fecha_retiro_error
             is_remito_saved = st.session_state.remito_saved_movil
             is_excel_saved = st.session_state.excel_saved_movil
+
+            if st.button("Ver Resúmen del Remito", width="stretch"):
+                st.session_state.show_resumen_movil = True
+                st.components.v1.html(
+                    """
+                    <script>
+                        (function() {
+                            function scrollToTop() {
+                                const doc = window.parent.document;
+                                if (!doc) return;
+                                const el = doc.getElementById('resumen_top_anchor');
+                                if (el) {
+                                    el.scrollIntoView({ behavior: 'auto', block: 'start' });
+                                }
+                                const containers = doc.querySelectorAll('[data-testid="stMain"], section.main, [data-testid="stAppViewContainer"]');
+                                containers.forEach(c => { c.scrollTop = 0; });
+                                if (doc.documentElement) doc.documentElement.scrollTop = 0;
+                                if (doc.body) doc.body.scrollTop = 0;
+                                window.parent.scrollTo(0, 0);
+                            }
+                            setTimeout(scrollToTop, 10);
+                            setTimeout(scrollToTop, 100);
+                        })();
+                    </script>
+                    """,
+                    height=0,
+                )
+                st.rerun()
 
             if st.button("Actualizar Datos Remito", type="primary" if not is_remito_saved else "secondary", width="stretch", disabled=st.session_state.is_form_disabled_movil or is_remito_saved or is_excel_saved or tiene_errores):
                 try:
