@@ -32,7 +32,7 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
     )
 
     st.title(f"Capello {config.VERSION}")
-    st.header("📄 Resúmen Remito")
+    st.subheader("📄 Resúmen Remito")
 
     # Subtítulo de Cabecera
     razon_social = cab.get("razon_social", "")
