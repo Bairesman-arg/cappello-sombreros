@@ -40,17 +40,24 @@ def remitos_ventas_movil():
         border-radius: 8px !important;
     }
     .stNumberInput input {
-        font-size: 1.1rem !important;
+        font-size: 1.05rem !important;
         text-align: center !important;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 1.5rem !important;
+        font-size: 1.3rem !important;
+    }
+    .header-sub-text {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #e0e0e0;
+        margin-top: 0.3rem;
+        margin-bottom: 0.8rem;
     }
     </style>
     """, unsafe_allow_html=True)
 
     st.title(config.TITULO_APP)
-    st.header("📱 Recepción Móvil de Remitos")
+    st.header("📱 Recepción Móvil")
 
     # Inicialización de variables de estado
     if "confirmar_nuevo_movil" not in st.session_state:
@@ -149,7 +156,7 @@ def remitos_ventas_movil():
 
             porc_dto_val = float(cab.get("porc_dto", 0) or 0)
             dto_str = f"{porc_dto_val:g}%"
-            st.subheader(f"#{remito_id}  |  Cliente: {cab['razon_social']} (Boca {cab['boca']})  |  Dto. {dto_str}")
+            st.markdown(f'<div class="header-sub-text">#{remito_id} &nbsp;|&nbsp; Cliente: {cab["razon_social"]} (Boca {cab["boca"]}) &nbsp;|&nbsp; Dto. {dto_str}</div>', unsafe_allow_html=True)
 
             if f"recepcion_el_dia_{remito_id}" not in st.session_state:
                 st.session_state[f"recepcion_el_dia_{remito_id}"] = False
@@ -192,8 +199,8 @@ def remitos_ventas_movil():
                 disabled=st.session_state.is_form_disabled_movil
             )
 
-            # === Carga e Ítems ===
-            st.subheader("Carga / Modificación de Items")
+            # === Carga / Modificación ===
+            st.subheader("Carga / Modificación")
             articulo_options_full = st.session_state.articulos_df.apply(
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
@@ -301,7 +308,7 @@ def remitos_ventas_movil():
             if st.session_state.get(f"recepcion_el_dia_{remito_id}", False):
                 st.success("Los Cambios afectarán al REMITO ORIGINAL reemplazando al anterior. Las VENTAS quedan pendientes a la Próxima Recepción.")
 
-            # --- Lista / Grilla de Devoluciones Adaptada ---
+            # --- Lista / Grilla de Devoluciones y Modificaciones Adaptada para Celular ---
             st.subheader("Ítems del Remito")
             df_items = st.session_state[items_key]
 
@@ -322,16 +329,27 @@ def remitos_ventas_movil():
                     dev = int(df_items.loc[idx, 'devueltos'])
                     obs_val = str(df_items.loc[idx, 'observaciones']) if pd.notna(df_items.loc[idx, 'observaciones']) else ""
 
-                    st.markdown(f"**Art. {nro_art} - {desc}**")
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, max_value=entreg, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                    st.markdown(f"### **Art. {nro_art} - {desc}**")
+                    
+                    # Controles completos de edición por artículo (Precio Real, Entregados, Devueltos, Obs)
+                    c_p, c_e = st.columns(2)
+                    with c_p:
+                        new_p_real = st.number_input(f"Precio Real ({nro_art}):", min_value=0.0, step=500.0, value=p_real, key=f"p_real_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        df_items.loc[idx, 'precio_real'] = new_p_real
+                    with c_e:
+                        new_entreg = st.number_input(f"Entregados ({nro_art}):", min_value=1, step=1, value=entreg, key=f"entreg_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                        df_items.loc[idx, 'entregados'] = new_entreg
+
+                    c_d, c_v = st.columns(2)
+                    with c_d:
+                        new_dev = st.number_input(f"Devueltos ({nro_art}):", min_value=0, value=dev, key=f"dev_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
                         df_items.loc[idx, 'devueltos'] = new_dev
-                    with c2:
-                        vend_item = max(0, entreg - new_dev)
+                    with c_v:
+                        vend_item = max(0, new_entreg - new_dev)
                         st.metric(f"Vendidos ({nro_art}):", vend_item)
 
-                    df_items.loc[idx, 'observaciones'] = st.text_input(f"Obs ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                    new_obs_item = st.text_input(f"Observaciones ({nro_art}):", value=obs_val, key=f"obs_item_movil_{remito_id}_{idx}", disabled=st.session_state.is_form_disabled_movil)
+                    df_items.loc[idx, 'observaciones'] = new_obs_item
                     st.divider()
 
                 items_invalidos = df_items[df_items["devueltos"] > df_items["entregados"]]
@@ -341,11 +359,22 @@ def remitos_ventas_movil():
                 items_entregados_invalidos = df_items[df_items["entregados"].isna() | (df_items["entregados"] <= 0)]
 
                 if not items_invalidos.empty:
-                    st.warning("⚠️ Hay artículos con más devueltos que entregados.")
+                    articuloss_inv = items_invalidos["nro_articulo"].tolist()
+                    st.warning(f"⚠️ Hay artículos {articuloss_inv} con más devueltos que entregados.")
                 if not items_precio_invalidos.empty:
-                    st.warning("⚠️ Hay artículos con Precio Real menor o igual a cero.")
+                    articuloss_p_inv = items_precio_invalidos["nro_articulo"].tolist()
+                    st.warning(f"⚠️ Los artículos {articuloss_p_inv} tienen un Precio Real inválido (debe ser mayor a 0). Corregir antes de guardar.")
                 if not items_precio_menor_costo.empty:
-                    st.warning(f"⚠️ Hay artículos con un Precio Real que no deja utilidad con el {porc_dto_val:.0f}% de descuento.")
+                    articuloss_menores = items_precio_menor_costo["nro_articulo"].tolist()
+                    articuloss_menores_str = "[" + ", ".join(str(x) for x in articuloss_menores) + "]"
+                    if porc_dto_val > 0:
+                        st.warning(f"⚠️ El artículo {articuloss_menores_str} tiene un Precio Real que no deja utilidad (con el {porc_dto_val:.0f}% de descuento queda por debajo del Costo). Corregir antes de guardar.")
+                    else:
+                        st.warning(f"⚠️ El artículo {articuloss_menores_str} tiene un Precio Real que no deja utilidad (es menor a su Costo). Corregir antes de guardar.")
+                if not items_entregados_invalidos.empty:
+                    articuloss_ent = items_entregados_invalidos["nro_articulo"].tolist()
+                    articuloss_ent_str = "[" + ", ".join(str(x) for x in articuloss_ent) + "]"
+                    st.warning(f"⚠️ Los artículos {articuloss_ent_str} tienen una cantidad Entregados inválida (debe ser mayor a 0). Corregir antes de guardar.")
 
             # --- Fecha de Retiro Validation ---
             is_recepcion_dia_current = bool(st.session_state.get(f"recepcion_el_dia_{remito_id}", False))
@@ -363,7 +392,7 @@ def remitos_ventas_movil():
                 else:
                     fecha_retiro_error = False
 
-            # --- Totales ---
+            # --- Totales y Utilidad Estimada (Hacia el final del formulario) ---
             if not df_items.empty:
                 t_ent = int(df_items["entregados"].sum())
                 t_dev = int(df_items["devueltos"].sum())
@@ -384,10 +413,14 @@ def remitos_ventas_movil():
                 t_ent = t_dev = t_vend = 0
                 t_util = 0.0
 
-            m1, m2 = st.columns(2)
-            with m1:
+            st.divider()
+            st.subheader("Totales y Utilidad")
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                st.metric("Total Entregados", t_ent)
                 st.metric("Total Vendidos", t_vend)
-            with m2:
+            with col_t2:
+                st.metric("Total Devueltos", t_dev)
                 st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
 
             # === Acciones Principales ===
