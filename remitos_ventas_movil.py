@@ -101,8 +101,17 @@ def remitos_ventas_movil():
     st.markdown("<div id='movil_top_anchor'></div>", unsafe_allow_html=True)
     st.title(f"Capello {config.VERSION}")
     st.header("📱 Recepción Móvil")
+    st.markdown(
+        '<div style="font-size: 0.8rem; color: #00E676; font-weight: 500; margin-top: -0.4rem; margin-bottom: 0.8rem;">'
+        'Recuerde Actualizar los Datos del Remito si hace modificaciones.</div>',
+        unsafe_allow_html=True
+    )
 
     # Inicialización de variables de estado
+    if st.session_state.get("should_clear_item_inputs_movil", False):
+        clear_item_inputs_rec_movil()
+        st.session_state.should_clear_item_inputs_movil = False
+
     if "confirmar_nuevo_movil" not in st.session_state:
         st.session_state.confirmar_nuevo_movil = False
     if "show_confirm_modal_movil" not in st.session_state:
@@ -392,7 +401,7 @@ def remitos_ventas_movil():
                             st.session_state[items_key] = pd.concat([st.session_state[items_key], new_row], ignore_index=True)
                             st.session_state.remito_saved_movil = False
                             st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
-                            clear_item_inputs_rec_movil()
+                            st.session_state.should_clear_item_inputs_movil = True
                             st.rerun()
 
             # --- Checkbox Recepción en el Día ---
