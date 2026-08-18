@@ -275,10 +275,12 @@ def remitos_ventas_movil():
             dto_str = f"{porc_dto_val:g}%"
             st.markdown(f'<div class="header-sub-text">#{remito_id} &nbsp;|&nbsp; Cliente: {cab["razon_social"]} (Boca {cab["boca"]}) &nbsp;|&nbsp; Dto. {dto_str}</div>', unsafe_allow_html=True)
 
-            if f"recepcion_el_dia_{remito_id}" not in st.session_state:
-                st.session_state[f"recepcion_el_dia_{remito_id}"] = False
+            saved_rec_key = f"recepcion_el_dia_saved_{remito_id}"
+            if saved_rec_key not in st.session_state:
+                st.session_state[saved_rec_key] = False
 
-            is_recepcion_dia = bool(st.session_state[f"recepcion_el_dia_{remito_id}"])
+            st.session_state[f"recepcion_el_dia_{remito_id}"] = st.session_state[saved_rec_key]
+            is_recepcion_dia = bool(st.session_state[saved_rec_key])
             habia_fecha_previa = cab.get("fecha_retiro") is not None
 
             if is_recepcion_dia:
@@ -360,6 +362,7 @@ def remitos_ventas_movil():
                         else:
                             st.session_state.precio_real_input_rec_movil = 0.0
                     st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
+                    st.session_state[f"recepcion_el_dia_saved_{remito_id}"] = rec_dia_curr
                     st.rerun()
 
             c_ent_add, c_pr_add = st.columns(2)
@@ -401,15 +404,24 @@ def remitos_ventas_movil():
                             st.session_state[items_key] = pd.concat([st.session_state[items_key], new_row], ignore_index=True)
                             st.session_state.remito_saved_movil = False
                             st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
+                            st.session_state[f"recepcion_el_dia_saved_{remito_id}"] = rec_dia_curr
                             st.session_state.should_clear_item_inputs_movil = True
                             st.rerun()
 
             # --- Checkbox Recepción en el Día ---
             c_check, c_space = st.columns([3, 1])
             with c_check:
-                st.checkbox("Recepción en el Día", key=f"recepcion_el_dia_{remito_id}", disabled=st.session_state.is_form_disabled_movil)
+                def update_rec_dia_saved():
+                    st.session_state[f"recepcion_el_dia_saved_{remito_id}"] = bool(st.session_state.get(f"recepcion_el_dia_{remito_id}"))
 
-            if st.session_state.get(f"recepcion_el_dia_{remito_id}", False):
+                st.checkbox(
+                    "Recepción en el Día",
+                    key=f"recepcion_el_dia_{remito_id}",
+                    on_change=update_rec_dia_saved,
+                    disabled=st.session_state.is_form_disabled_movil
+                )
+
+            if st.session_state.get(f"recepcion_el_dia_saved_{remito_id}", False):
                 st.success("Los Cambios afectarán al REMITO ORIGINAL reemplazando al anterior. Las VENTAS quedan pendientes a la Próxima Recepción.")
 
             # --- Lista / Grilla de Devoluciones y Modificaciones Adaptada para Celular ---
@@ -555,8 +567,6 @@ def remitos_ventas_movil():
                 "Vendidos": t_vend
             }])
             st.dataframe(totales_df, use_container_width=True, hide_index=True)
-
-            st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
 
             # === Acciones Principales ===
             st.subheader("Acciones del Remito")

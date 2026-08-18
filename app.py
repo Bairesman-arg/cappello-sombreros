@@ -68,12 +68,12 @@ def app():
             """
             <style>
                 [data-testid="stSidebar"] {
-                    min-width: 300px;
-                    max-width: 300px;
+                    min-width: 280px;
+                    max-width: 280px;
                 }
                 [data-testid="stSidebarUserContent"],
                 section[data-testid="stSidebar"] > div {
-                    padding-top: 1rem !important;
+                    padding-top: 0.5rem !important;
                 }
                 [data-testid="stSidebarHeader"],
                 [data-testid="stSidebarNav"],
@@ -81,14 +81,57 @@ def app():
                 div[data-testid="stSidebarNavSeparator"] {
                     display: none !important;
                 }
+                [data-testid="stSidebar"] button,
+                [data-testid="stSidebar"] button div,
+                [data-testid="stSidebar"] button p {
+                    font-size: 0.78rem !important;
+                    font-weight: 500 !important;
+                }
+                [data-testid="stSidebar"] button {
+                    padding: 0.2rem 0.5rem !important;
+                    min-height: 1.9rem !important;
+                }
             </style>
             """,
             unsafe_allow_html=True,
         )
 
+        # Botón arriba de todo para recargar la navegación
+        if st.button("🔄 Recargar Menús", use_container_width=True, help="Refresca la navegación"):
+            for k in ["main_menu_nav", "remitos_sub_nav", "articulos_sub_nav", "backup_sub_nav", "currentpage"]:
+                st.session_state.pop(k, None)
+            st.rerun()
+
+        st.markdown("<div style='margin-bottom: 0.4rem;'></div>", unsafe_allow_html=True)
+
         # Control de estado de navegación
         if 'currentpage' not in st.session_state:
             st.session_state.currentpage = 'Codigos de Barra'
+
+        menu_styles = {
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "#fafafa", "font-size": "13px"},
+            "nav-link": {
+                "font-size": "13px",
+                "text-align": "left",
+                "margin": "2px 0px",
+                "padding": "5px 10px",
+            },
+            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "13px", "font-weight": "600"},
+        }
+
+        submenu_styles = {
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "#fafafa", "font-size": "12px"},
+            "title": {"font-size": "13px", "font-weight": "600"},
+            "nav-link": {
+                "font-size": "12px",
+                "text-align": "left",
+                "margin": "2px 0px",
+                "padding": "4px 10px",
+            },
+            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "12px", "font-weight": "600"},
+        }
 
         # MENÚ PRINCIPAL - Incluye Rubros, Informes y Backup
         mainmenu = option_menu(menu_title=None,
@@ -96,40 +139,58 @@ def app():
                                icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
                                menu_icon="app-indicator",
                                default_index=0,
+                               styles=menu_styles,
                                key="main_menu_nav")
+
+        if not mainmenu:
+            mainmenu = st.session_state.get("currentpage", "Codigos de Barra")
 
         # Detectar cambio de página principal
         if mainmenu != st.session_state.currentpage:
             st.session_state.currentpage = mainmenu
-            # Resetear claves de submenús en session_state para que arranquen limpias en default_index=0
-            st.session_state.pop("remitos_sub_nav", None)
-            st.session_state.pop("articulos_sub_nav", None)
-            st.session_state.pop("backup_sub_nav", None)
+            st.session_state["remitos_sub_nav"] = "Entregas"
+            st.session_state["articulos_sub_nav"] = "ABM Articulos"
+            st.session_state["backup_sub_nav"] = "Crear Backup"
             for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
                 st.session_state.pop(clave, None)
 
         if mainmenu == "Remitos":
+            if "remitos_sub_nav" not in st.session_state or not st.session_state["remitos_sub_nav"]:
+                st.session_state["remitos_sub_nav"] = "Entregas"
             submenu = option_menu(menu_title="Remitos",
                                   options=["Entregas", "Recepciones", "Carga Móvil", "Anulaciones"],
                                   icons=["file-earmark-plus", "file-earmark-plus", "phone", "file-earmark-plus"],
                                   menu_icon="folder", default_index=0, orientation="vertical",
+                                  styles=submenu_styles,
                                   key="remitos_sub_nav")
+            if not submenu:
+                submenu = st.session_state.get("remitos_sub_nav", "Entregas")
 
         elif mainmenu == "Articulos":
+            if "articulos_sub_nav" not in st.session_state or not st.session_state["articulos_sub_nav"]:
+                st.session_state["articulos_sub_nav"] = "ABM Articulos"
             submenu = option_menu(menu_title="Articulos",
                                   options=["ABM Articulos", "Cargar Novedades"],
                                   icons=["file-earmark-plus", "file-earmark-plus"],
                                   menu_icon="folder", default_index=0, orientation="vertical",
+                                  styles=submenu_styles,
                                   key="articulos_sub_nav")
+            if not submenu:
+                submenu = st.session_state.get("articulos_sub_nav", "ABM Articulos")
         
         elif mainmenu == "Backup":
+            if "backup_sub_nav" not in st.session_state or not st.session_state["backup_sub_nav"]:
+                st.session_state["backup_sub_nav"] = "Crear Backup"
             submenu = option_menu(menu_title="Backup",
                                   options=["Crear Backup", "Restaurar Backup"],
                                   icons=["download", "upload"],
                                   menu_icon="shield-check", 
                                   default_index=0, 
                                   orientation="vertical",
+                                  styles=submenu_styles,
                                   key="backup_sub_nav")
+            if not submenu:
+                submenu = st.session_state.get("backup_sub_nav", "Crear Backup")
         else:
             submenu = None
 

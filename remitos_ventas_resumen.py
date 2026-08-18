@@ -43,7 +43,7 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
     f_entrega = cab.get("fecha_entrega")
     f_entrega_str = f_entrega.strftime("%d/%m/%Y") if hasattr(f_entrega, "strftime") else (str(f_entrega) if f_entrega else "-")
 
-    is_rec_dia = bool(st.session_state.get(f"recepcion_el_dia_{remito_id}", False))
+    is_rec_dia = bool(st.session_state.get(f"recepcion_el_dia_saved_{remito_id}", st.session_state.get(f"recepcion_el_dia_{remito_id}", False)))
     f_retiro = None if is_rec_dia else (st.session_state.get(f"f_ret_m_{remito_id}") or cab.get("fecha_retiro"))
 
     if is_rec_dia:
@@ -137,9 +137,6 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         for col in totales_df.columns
     }
     st.dataframe(totales_df, use_container_width=True, hide_index=True, column_config=totales_column_cfg)
-
-    # Utilidad Estimada debajo de la grilla
-    st.metric("Utilidad Estimada", f"$ {t_util:,.2f}")
 
     # Botón de Cerrar Resúmen
     if st.button("Cerrar Resúmen", type="primary", width="stretch"):
