@@ -355,7 +355,7 @@ def remitos_entregas():
         elif st.session_state.precio_real_input <= 0:
             st.error("El precio real debe ser mayor a cero. Vuelva a seleccionar el artículo.")
         elif p_neto < costo_val:
-            st.error(f"⚠️ El Precio Real (${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${p_neto:,.2f} vs Costo: ${costo_val:,.2f}).")
+            st.error(f"⚠️ El Precio Real (\${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${p_neto:,.2f} vs Costo: \${costo_val:,.2f}).")
         else:
             new_item = {
                 'Articulo': articulo_sel,
@@ -385,7 +385,7 @@ def remitos_entregas():
         if st.session_state.entregados_input < 1:
             st.error("La cantidad entregada debe ser 1 o mayor.")
         elif p_neto < costo_val:
-            st.error(f"⚠️ El Precio Real (${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${p_neto:,.2f} vs Costo: ${costo_val:,.2f}).")
+            st.error(f"⚠️ El Precio Real (\${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${p_neto:,.2f} vs Costo: \${costo_val:,.2f}).")
         else:
             idx = st.session_state.items_data.index[
                 st.session_state.items_data['Articulo'] == articulo_sel
@@ -455,9 +455,28 @@ def remitos_entregas():
     # === BOTONES PRINCIPALES ===
     st.header("Acciones del Remito")
 
+    # Verificar si hay algún ítem con precio real que no deje utilidad
+    has_item_price_error = False
+    if not st.session_state.items_data.empty and 'articulos_df' in st.session_state:
+        porc_dto_val = float(st.session_state.get('porc_dto', 0) or 0)
+        for _, row in st.session_state.items_data.iterrows():
+            art_num = row['Articulo']
+            p_real = float(row['Precio Real'])
+            p_neto = p_real * (1.0 - (porc_dto_val / 100.0))
+            matching_art = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == art_num]
+            if not matching_art.empty:
+                costo_val = float(matching_art.iloc[0]['costo']) if ('costo' in matching_art.iloc[0] and pd.notna(matching_art.iloc[0]['costo'])) else 0.0
+                if p_neto < costo_val and costo_val > 0:
+                    has_item_price_error = True
+                    break
+
+    if has_item_price_error:
+        st.error("⚠️ No se puede guardar el remito: contiene artículos cuyo Precio Real no deja utilidad (queda por debajo del Costo con el descuento aplicado).")
+
     is_remito_saved = st.session_state.remito_id is not None
     can_save = (st.session_state.cabecera_data['cliente_id'] is not None and
-                not st.session_state.items_data.empty)
+                not st.session_state.items_data.empty and
+                not has_item_price_error)
 
     col_buttons = st.columns(3, gap="small")
 
@@ -465,7 +484,7 @@ def remitos_entregas():
     say_error = False
     with col_buttons[0]:
         if st.button("Guardar Remito", type="primary", width="stretch",
-                    disabled=st.session_state.is_form_disabled or is_remito_saved):
+                    disabled=st.session_state.is_form_disabled or is_remito_saved or not can_save):
             if not can_save:
                 say_error = True
             else:

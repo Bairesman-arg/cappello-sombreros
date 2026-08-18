@@ -98,7 +98,7 @@ def app():
 
         # Botón arriba de todo para recargar la navegación
         if st.button("🔄 Recargar Menús", use_container_width=True, help="Refresca la navegación"):
-            for k in ["main_menu_nav", "remitos_sub_nav", "articulos_sub_nav", "backup_sub_nav", "currentpage"]:
+            for k in ["main_menu_nav", "remitos_sub_nav", "articulos_sub_nav", "informes_sub_nav", "backup_sub_nav", "currentpage"]:
                 st.session_state.pop(k, None)
             st.rerun()
 
@@ -110,27 +110,27 @@ def app():
 
         menu_styles = {
             "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#fafafa", "font-size": "13px"},
+            "icon": {"color": "#fafafa", "font-size": "15px"},
             "nav-link": {
-                "font-size": "13px",
+                "font-size": "15px",
                 "text-align": "left",
-                "margin": "2px 0px",
-                "padding": "5px 10px",
+                "margin": "3px 0px",
+                "padding": "6px 10px",
             },
-            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "13px", "font-weight": "600"},
+            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "15px", "font-weight": "600"},
         }
 
         submenu_styles = {
             "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#fafafa", "font-size": "12px"},
-            "title": {"font-size": "13px", "font-weight": "600"},
+            "icon": {"color": "#fafafa", "font-size": "14px"},
+            "title": {"font-size": "15px", "font-weight": "600"},
             "nav-link": {
-                "font-size": "12px",
+                "font-size": "14px",
                 "text-align": "left",
-                "margin": "2px 0px",
-                "padding": "4px 10px",
+                "margin": "3px 0px",
+                "padding": "5px 10px",
             },
-            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "12px", "font-weight": "600"},
+            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "14px", "font-weight": "600"},
         }
 
         # MENÚ PRINCIPAL - Incluye Rubros, Informes y Backup
@@ -150,6 +150,7 @@ def app():
             st.session_state.currentpage = mainmenu
             st.session_state["remitos_sub_nav"] = "Entregas"
             st.session_state["articulos_sub_nav"] = "ABM Articulos"
+            st.session_state["informes_sub_nav"] = "Ganancias por Día"
             st.session_state["backup_sub_nav"] = "Crear Backup"
             for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
                 st.session_state.pop(clave, None)
@@ -177,6 +178,20 @@ def app():
                                   key="articulos_sub_nav")
             if not submenu:
                 submenu = st.session_state.get("articulos_sub_nav", "ABM Articulos")
+
+        elif mainmenu == "Informes":
+            if "informes_sub_nav" not in st.session_state or not st.session_state["informes_sub_nav"]:
+                st.session_state["informes_sub_nav"] = "Ganancias por Día"
+            submenu = option_menu(menu_title="Informes",
+                                  options=["Ganancias por Día", "Ranking por Empresa", "Ranking por Artículo"],
+                                  icons=["graph-up-arrow", "building", "box-seam"],
+                                  menu_icon="graph-up", 
+                                  default_index=0, 
+                                  orientation="vertical",
+                                  styles=submenu_styles,
+                                  key="informes_sub_nav")
+            if not submenu:
+                submenu = st.session_state.get("informes_sub_nav", "Ganancias por Día")
         
         elif mainmenu == "Backup":
             if "backup_sub_nav" not in st.session_state or not st.session_state["backup_sub_nav"]:
@@ -230,8 +245,18 @@ def app():
 
     elif mainmenu == "Informes":
         st.title(config.TITULO_APP)
-        st.header("Informes")
-        st.info("Módulo de Informes en desarrollo.")
+        if submenu == "Ganancias por Día":
+            from info_ganancias import info_ganancias_dia
+            info_ganancias_dia()
+        elif submenu == "Ranking por Empresa":
+            st.header("Informes - Ranking por Empresa")
+            st.info("Módulo de Ranking por Empresa en desarrollo.")
+        elif submenu == "Ranking por Artículo":
+            st.header("Informes - Ranking por Artículo")
+            st.info("Módulo de Ranking por Artículo en desarrollo.")
+        else:
+            st.header("Informes")
+            st.info("Módulo de Informes en desarrollo.")
     
     # NUEVA SECCIÓN PARA BACKUP - Importación lazy
     elif mainmenu == "Backup":

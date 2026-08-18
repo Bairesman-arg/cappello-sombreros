@@ -1,11 +1,12 @@
 openpyxl
+pandas
 python-barcode
 Pillow
 streamlit>=1.31.0
 reportlab
 streamlit_option_menu
 sqlalchemy
-python-barcode
 setuptools
 psycopg2-binary
 numpy
+altair

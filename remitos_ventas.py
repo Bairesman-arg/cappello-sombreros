@@ -348,7 +348,7 @@ def remitos_ventas():
                         porc_dto_val = float(cab.get("porc_dto", 0) or 0)
                         precio_neto_input = st.session_state.precio_real_input_rec * (1.0 - (porc_dto_val / 100.0))
                         if precio_neto_input < costo_val:
-                            st.session_state.item_rec_message = ("error", f"⚠️ El Precio Real (${st.session_state.precio_real_input_rec:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${precio_neto_input:,.2f} vs Costo: ${costo_val:,.2f}).")
+                            st.session_state.item_rec_message = ("error", f"⚠️ El Precio Real (\${st.session_state.precio_real_input_rec:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${precio_neto_input:,.2f} vs Costo: \${costo_val:,.2f}).")
                             st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                             st.rerun()
 
