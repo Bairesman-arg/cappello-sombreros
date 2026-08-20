@@ -148,12 +148,6 @@ def app():
         # Botón arriba de todo para recargar la navegación
         if st.button("🔄 Recargar Menús", width="stretch", help="Refresca la navegación"):
             st.session_state.menu_version = st.session_state.get("menu_version", 0) + 1
-            st.session_state.currentpage = 'Codigos de Barra'
-            for k in ["remitos_sub_nav", "articulos_sub_nav", "informes_sub_nav", "backup_sub_nav"]:
-                st.session_state.pop(k, None)
-            for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
-                st.session_state.pop(clave, None)
-            st.cache_data.clear()
             st.rerun()
 
         st.markdown("<div style='margin-bottom: 0.4rem;'></div>", unsafe_allow_html=True)
@@ -193,7 +187,7 @@ def app():
         }
 
         # MENÚ PRINCIPAL - Incluye Rubros, Informes y Backup
-        mainmenu = option_menu(menu_title=None,
+        main_selected = option_menu(menu_title=None,
                                options=main_options,
                                icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
                                menu_icon="app-indicator",
@@ -201,56 +195,58 @@ def app():
                                styles=menu_styles,
                                key=f"main_menu_nav_{menu_v}")
 
-        if not mainmenu:
-            mainmenu = st.session_state.get("currentpage", "Codigos de Barra")
-
-        # Detectar cambio de página principal
-        if mainmenu != st.session_state.currentpage:
-            st.session_state.currentpage = mainmenu
-            st.session_state["remitos_sub_nav"] = "Entregas"
-            st.session_state["articulos_sub_nav"] = "ABM Articulos"
-            st.session_state["informes_sub_nav"] = "Ganancias por Día"
-            st.session_state["backup_sub_nav"] = "Crear Backup"
+        # Solo si main_selected devuelve un valor válido (evita rehidratación asíncrona de iframe en la nube)
+        if main_selected and main_selected != st.session_state.get("currentpage"):
+            st.session_state.currentpage = main_selected
+            if main_selected == "Remitos":
+                st.session_state["remitos_sub_nav"] = "Entregas"
+            elif main_selected == "Articulos":
+                st.session_state["articulos_sub_nav"] = "ABM Articulos"
+            elif main_selected == "Informes":
+                st.session_state["informes_sub_nav"] = "Ganancias por Día"
+            elif main_selected == "Backup":
+                st.session_state["backup_sub_nav"] = "Crear Backup"
             for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
                 st.session_state.pop(clave, None)
+
+        mainmenu = st.session_state.get("currentpage", "Codigos de Barra")
 
         if mainmenu == "Remitos":
             rem_options = ["Entregas", "Recepciones", "Consultas", "Carga Móvil", "Anulaciones"]
             cur_rem_sub = st.session_state.get("remitos_sub_nav", "Entregas")
             def_rem_idx = rem_options.index(cur_rem_sub) if cur_rem_sub in rem_options else 0
-            if "remitos_sub_nav" not in st.session_state or not st.session_state["remitos_sub_nav"]:
-                st.session_state["remitos_sub_nav"] = cur_rem_sub
-            submenu = option_menu(menu_title="Remitos",
+
+            sub_selected = option_menu(menu_title="Remitos",
                                   options=rem_options,
                                   icons=["file-earmark-plus", "file-earmark-plus", "search", "phone", "file-earmark-plus"],
                                   menu_icon="folder", default_index=def_rem_idx, orientation="vertical",
                                   styles=submenu_styles,
                                   key=f"remitos_sub_nav_{menu_v}")
-            if not submenu:
-                submenu = st.session_state.get("remitos_sub_nav", "Entregas")
+            if sub_selected:
+                st.session_state["remitos_sub_nav"] = sub_selected
+            submenu = st.session_state.get("remitos_sub_nav", "Entregas")
 
         elif mainmenu == "Articulos":
             art_options = ["ABM Articulos", "Cargar Novedades"]
             cur_art_sub = st.session_state.get("articulos_sub_nav", "ABM Articulos")
             def_art_idx = art_options.index(cur_art_sub) if cur_art_sub in art_options else 0
-            if "articulos_sub_nav" not in st.session_state or not st.session_state["articulos_sub_nav"]:
-                st.session_state["articulos_sub_nav"] = cur_art_sub
-            submenu = option_menu(menu_title="Articulos",
+
+            sub_selected = option_menu(menu_title="Articulos",
                                   options=art_options,
                                   icons=["file-earmark-plus", "file-earmark-plus"],
                                   menu_icon="folder", default_index=def_art_idx, orientation="vertical",
                                   styles=submenu_styles,
                                   key=f"articulos_sub_nav_{menu_v}")
-            if not submenu:
-                submenu = st.session_state.get("articulos_sub_nav", "ABM Articulos")
+            if sub_selected:
+                st.session_state["articulos_sub_nav"] = sub_selected
+            submenu = st.session_state.get("articulos_sub_nav", "ABM Articulos")
 
         elif mainmenu == "Informes":
             inf_options = ["Ganancias por Día", "Ranking por Empresa", "Ranking por Artículo"]
             cur_inf_sub = st.session_state.get("informes_sub_nav", "Ganancias por Día")
             def_inf_idx = inf_options.index(cur_inf_sub) if cur_inf_sub in inf_options else 0
-            if "informes_sub_nav" not in st.session_state or not st.session_state["informes_sub_nav"]:
-                st.session_state["informes_sub_nav"] = cur_inf_sub
-            submenu = option_menu(menu_title="Informes",
+
+            sub_selected = option_menu(menu_title="Informes",
                                   options=inf_options,
                                   icons=["graph-up-arrow", "building", "box-seam"],
                                   menu_icon="graph-up", 
@@ -258,16 +254,16 @@ def app():
                                   orientation="vertical",
                                   styles=submenu_styles,
                                   key=f"informes_sub_nav_{menu_v}")
-            if not submenu:
-                submenu = st.session_state.get("informes_sub_nav", "Ganancias por Día")
+            if sub_selected:
+                st.session_state["informes_sub_nav"] = sub_selected
+            submenu = st.session_state.get("informes_sub_nav", "Ganancias por Día")
         
         elif mainmenu == "Backup":
             bak_options = ["Crear Backup", "Restaurar Backup"]
             cur_bak_sub = st.session_state.get("backup_sub_nav", "Crear Backup")
             def_bak_idx = bak_options.index(cur_bak_sub) if cur_bak_sub in bak_options else 0
-            if "backup_sub_nav" not in st.session_state or not st.session_state["backup_sub_nav"]:
-                st.session_state["backup_sub_nav"] = cur_bak_sub
-            submenu = option_menu(menu_title="Backup",
+
+            sub_selected = option_menu(menu_title="Backup",
                                   options=bak_options,
                                   icons=["download", "upload"],
                                   menu_icon="shield-check", 
@@ -275,8 +271,9 @@ def app():
                                   orientation="vertical",
                                   styles=submenu_styles,
                                   key=f"backup_sub_nav_{menu_v}")
-            if not submenu:
-                submenu = st.session_state.get("backup_sub_nav", "Crear Backup")
+            if sub_selected:
+                st.session_state["backup_sub_nav"] = sub_selected
+            submenu = st.session_state.get("backup_sub_nav", "Crear Backup")
         else:
             submenu = None
 
