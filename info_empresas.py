@@ -191,7 +191,7 @@ def info_empresas_ranking():
     # Asignar Posición (1 a X)
     agrupado["Posición"] = range(1, len(agrupado) + 1)
     agrupado["Boca"] = agrupado["boca"].astype(int)
-    agrupado["Nombre del Cliente"] = agrupado["razon_social"]
+    agrupado["Nombre del Cliente"] = agrupado.apply(lambda r: f"{r['razon_social']} (Boca {int(r['boca'])})" if int(r['boca']) > 0 else str(r['razon_social']), axis=1)
     agrupado["Cant. Remitos"] = agrupado["cant_remitos"].astype(int)
     agrupado["Cant. Artículos"] = agrupado["cant_articulos"].astype(int)
     agrupado["Utilidad ($)"] = agrupado["utilidad_cliente"].round(2)
