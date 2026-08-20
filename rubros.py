@@ -42,7 +42,6 @@ def on_nombre_change():
         st.session_state.nombre_rubro_val = val_upper
 
 def rubros_crud():
-    st.set_page_config(layout="wide")
     st.title(config.TITULO_APP)
 
     # Inicialización de estado

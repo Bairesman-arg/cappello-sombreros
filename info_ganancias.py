@@ -213,7 +213,7 @@ def info_ganancias_dia():
             "Utilidad ($)": "$ {:,.2f}",
             "Margen de Ganancia (%)": "{:.2f} %"
         }),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         height=390,
         column_config=column_cfg

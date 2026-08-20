@@ -627,22 +627,34 @@ def check_client_in_remitos(cliente_id):
         result = conn.execute(text("SELECT COUNT(*) FROM remitos WHERE cliente_id = :id;"), {"id": cliente_id}).scalar()
         return result > 0
     
-def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df):
+def update_remito_data(remito_id, fecha_retiro, observaciones_cabecera, items_df, fecha_entrega=None):
     """
-    Actualiza la cabecera y los items de un remito existente.
+    Actualiza la cabecera (incluyendo opcionalmente fecha_entrega) y los items de un remito existente.
     """
     remito_id = int(remito_id)
     with engine.begin() as conn:
         # Actualizar la cabecera del remito
-        conn.execute(text("""
-            UPDATE remitos
-            SET fecha_retiro = :fr, observaciones = :obs, fecha_mod = CURRENT_TIMESTAMP
-            WHERE id = :rid
-        """), {
-            "fr": fecha_retiro,
-            "obs": observaciones_cabecera,
-            "rid": remito_id
-        })
+        if fecha_entrega is not None:
+            conn.execute(text("""
+                UPDATE remitos
+                SET fecha_entrega = :fe, fecha_retiro = :fr, observaciones = :obs, fecha_mod = CURRENT_TIMESTAMP
+                WHERE id = :rid
+            """), {
+                "fe": fecha_entrega,
+                "fr": fecha_retiro,
+                "obs": observaciones_cabecera,
+                "rid": remito_id
+            })
+        else:
+            conn.execute(text("""
+                UPDATE remitos
+                SET fecha_retiro = :fr, observaciones = :obs, fecha_mod = CURRENT_TIMESTAMP
+                WHERE id = :rid
+            """), {
+                "fr": fecha_retiro,
+                "obs": observaciones_cabecera,
+                "rid": remito_id
+            })
 
         # Verificar si la tabla remito_items tiene la columna 'devueltos'
         # Si no existe, agregarla

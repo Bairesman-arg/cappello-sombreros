@@ -43,32 +43,65 @@ def clear_status_message():
 
 def valida_datos():
     valida = False
+    costo = float(st.session_state.costo_final or 0)
+    precio_pub = float(st.session_state.precio_publico_final or 0)
+    precio_real = float(st.session_state.precio_real_final or 0)
+
     if len(st.session_state.nro_articulo_final) > 11:
         set_status_message("❌ Muchos caracteres para el 'Número de artículo'. El máximo es 11.", "error")
-    elif st.session_state.descripcion_final == "":
+    elif not st.session_state.descripcion_final or st.session_state.descripcion_final.strip() == "":
         set_status_message("❌ Debe ingresar una descripción para el artículo.", "error")
-    elif st.session_state.precio_real_final == 0:
-        set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio Real al Público' en cero.", "error")
+    elif costo <= 0:
+        set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Costo' en cero o valor negativo.", "error")
+    elif precio_real <= 0:
+        set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio Real al Público' en cero o valor negativo.", "error")
+    elif precio_pub <= 0:
+        set_status_message("❌ No se puede agregar o modificar un artículo dejando el 'Precio al Público' en cero o valor negativo.", "error")
     else:
         valida = True
     return valida
+
+def obtener_advertencias_precios():
+    warnings = []
+    costo = float(st.session_state.costo_final or 0)
+    precio_pub = float(st.session_state.precio_publico_final or 0)
+    precio_real = float(st.session_state.precio_real_final or 0)
+
+    # 1. El Precio al Publico es mayor o menor al Costo * 3
+    sugerido = costo * 3.0
+    if abs(precio_pub - sugerido) > 0.01:
+        if precio_pub > sugerido:
+            warnings.append(f"⚠️ Aviso: El 'Precio al Público' (\${precio_pub:,.2f}) es MAYOR al Costo x 3 (\${sugerido:,.2f}).")
+        else:
+            warnings.append(f"⚠️ Aviso: El 'Precio al Público' (\${precio_pub:,.2f}) es MENOR al Costo x 3 (\${sugerido:,.2f}).")
+
+    # 2. Cuando el Precio Real es menor al Precio al Publico * 0.9 (tolerancia del 10%)
+    tolerancia_10 = precio_pub * 0.9
+    if precio_real < tolerancia_10 - 0.01:
+        pct_dto = (1.0 - (precio_real / precio_pub)) * 100.0 if precio_pub > 0 else 0
+        warnings.append(f"⚠️ Aviso: El 'Precio Real al Público' (\${precio_real:,.2f}) es inferior al 'Precio al Público' (\${precio_pub:,.2f}). Es un descuento del {pct_dto:.1f}% que supera la tolerancia del 10%.")
+
+    return warnings
 
 def on_add_click():
     if valida_datos():
         try:
             nro_to_save = st.session_state.nro_articulo_final.upper()
             descripcion_to_save = st.session_state.descripcion_final.strip().capitalize()
-            rubro_id = st.session_state.rubros_df[st.session_state.rubros_df['nombre_rubro'] == st.session_state.rubro_final]['id'].iloc[0] # <-- Obtener el ID del rubro
+            rubro_id = st.session_state.rubros_df[st.session_state.rubros_df['nombre_rubro'] == st.session_state.rubro_final]['id'].iloc[0]
             
+            warnings = obtener_advertencias_precios()
+
             save_new_articulo(
                 nro_to_save,
                 descripcion_to_save, 
                 st.session_state.costo_final, 
                 st.session_state.precio_publico_final, 
                 st.session_state.precio_real_final,
-                int(rubro_id) # <-- Pasar el ID del rubro
+                int(rubro_id)
             )
             set_status_message(f"➕ Artículo '{nro_to_save}' agregado con éxito.", "success")
+            st.session_state.status_warnings = warnings
             clear_inputs()
             config.init_clientes_articulos()
         except Exception as e:
@@ -79,7 +112,9 @@ def on_add_click():
 def on_mod_click():
     if valida_datos() and st.session_state.selected_articulo_id:
         try:
-            rubro_id = st.session_state.rubros_df[st.session_state.rubros_df['nombre_rubro'] == st.session_state.rubro_final]['id'].iloc[0] # <-- Obtener el ID del rubro
+            rubro_id = st.session_state.rubros_df[st.session_state.rubros_df['nombre_rubro'] == st.session_state.rubro_final]['id'].iloc[0]
+
+            warnings = obtener_advertencias_precios()
 
             update_existing_articulo(
                 st.session_state.selected_articulo_id, 
@@ -88,10 +123,11 @@ def on_mod_click():
                 st.session_state.costo_final, 
                 st.session_state.precio_publico_final, 
                 st.session_state.precio_real_final,
-                int(rubro_id) # <-- Pasar el ID del rubro
+                int(rubro_id)
             )
             set_status_message(f"✍️ Artículo '{st.session_state.nro_articulo_final}' modificado con éxito.", "success")
-            st.session_state.do_filter = True # Obligo a refrescar la grilla            
+            st.session_state.status_warnings = warnings
+            st.session_state.do_filter = True            
             clear_inputs()
             st.session_state.view_grilla = True
             config.init_clientes_articulos()
@@ -109,10 +145,6 @@ def on_del_click():
 
 
 def articulos_crud():
-
-    st.set_page_config(
-        layout="wide"
-    )
 
     st.title(config.TITULO_APP)
 
@@ -186,6 +218,7 @@ def articulos_crud():
             
             if found_articulo['nombre_rubro']:
                 st.session_state.rubro_final = found_articulo['nombre_rubro']
+            st.session_state.focus_desc = True
         else:
             st.session_state.nro_articulo_exists = False
             st.session_state.selected_articulo_id = None
@@ -327,6 +360,11 @@ def articulos_crud():
         
         clear_status_message()
 
+    if st.session_state.get("status_warnings"):
+        for warn in st.session_state.status_warnings:
+            st.warning(warn)
+        st.session_state.status_warnings = None
+
     if 'show_delete_modal' in st.session_state and st.session_state.show_delete_modal:
         st.warning("⚠️ ¿Está seguro que desea eliminar este artículo? Esta acción no se puede deshacer.")
         col_confirm_del, col_cancel_del, _, _ = st.columns(4, gap="small")
@@ -356,6 +394,10 @@ def articulos_crud():
         """
         <style>
         div[data-testid="stElementContainer"]:has(button[key*="btn_excel"]),
+        div.stButton:has(button[key*="btn_excel"]) {
+            display: flex !important;
+            width: 100% !important;
+        }
         div.stButton:has(button[key*="btn_excel"]) {
             display: flex !important;
             width: 100% !important;
@@ -493,32 +535,32 @@ def articulos_crud():
                 column_config={
                     "Seleccionado": st.column_config.CheckboxColumn("✔", 
                                     help="Marque alguna de estas casillas de verificación\n\npara editar el artículo.",
-                                    width=50),
+                                    width=40),
                     "nro_articulo": st.column_config.TextColumn("Artículo",
-                                    width=calcular_ancho_columna(df_to_show,"nro_articulo")),
+                                    width=95),
                     "descripcion": st.column_config.TextColumn("Descripción", 
                                                             width=calcular_ancho_columna(df_to_show,"descripcion"),
                                                             disabled=True),
                     "nombre_rubro": st.column_config.TextColumn("Rubro",
-                                                                width=calcular_ancho_columna(df_to_show,"nombre_rubro")),
+                                                                width=100),
                     "costo": st.column_config.NumberColumn(
                         "Costo",
-                        width=calcular_ancho_columna(df_to_show,"costo"),
+                        width=95,
                         format="$ %.2f"
                     ),
                     "precio_real": st.column_config.NumberColumn(
                         "Real Público",
-                        width=calcular_ancho_columna(df_to_show,"precio_real"),
+                        width=105,
                         format="$ %.2f"
                     ),
                     "precio_publico": st.column_config.NumberColumn(
                         "Precio Público",
-                        width=calcular_ancho_columna(df_to_show,"precio_publico"),
+                        width=110,
                         format="$ %.2f"
                     ),
                     "fecha_mod": st.column_config.DatetimeColumn(
                         "Última Modificación",
-                        width=calcular_ancho_columna(df_to_show,"fecha_mod") #,
+                        width=130
                     )
                 }
             )
@@ -545,6 +587,7 @@ def articulos_crud():
                 st.session_state.nro_articulo_exists = True
                 st.session_state.selected_articulo_id = int(selected_row["id"])
                 st.session_state.grid_version = st.session_state.get('grid_version', 0) + 1
+                st.session_state.focus_desc = True
 
                 st.session_state.view_grilla = False
                 st.rerun()

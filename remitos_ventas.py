@@ -21,7 +21,6 @@ import time
 import config
 
 def remitos_ventas():
-    st.set_page_config(layout="wide")
     st.title(config.TITULO_APP)
     st.header("Recepción de Remitos")
 
@@ -85,7 +84,7 @@ def remitos_ventas():
 
     # Manejo de flags de rerun
     if st.session_state.get("should_clear_items_rec", False):
-        clear_item_inputs_rec()
+        clear_item_inputs_rec(set_focus=True)
         st.session_state.should_clear_items_rec = False
 
     if st.session_state.should_reset_all:
@@ -108,7 +107,7 @@ def remitos_ventas():
     st.session_state.is_form_disabled = st.session_state.show_confirm_modal or st.session_state.excel_saved
 
     # --- Entrada de número de remito ---
-    col1, _ = st.columns([1, 4], gap="small")
+    col1, col2, _ = st.columns([1.5, 1.5, 2], gap="small", vertical_alignment="bottom")
 
     # Función para cargar remito automáticamente
     def cargar_remito_auto():
@@ -155,6 +154,15 @@ def remitos_ventas():
             disabled=st.session_state.is_form_disabled
         )
 
+    with col2:
+        if "remito_activo_rec" in st.session_state and st.session_state["remito_activo_rec"] is not None:
+            active_id = st.session_state["remito_activo_rec"]
+            st.checkbox(
+                "Recepción en el Día",
+                key=f"recepcion_el_dia_{active_id}",
+                disabled=st.session_state.is_form_disabled
+            )
+
 
 
     # Mostrar mensajes después de cualquier carga
@@ -173,15 +181,18 @@ def remitos_ventas():
         
         if cab_key in st.session_state and items_key in st.session_state:
             cab = st.session_state[cab_key]
-            
-            porc_dto_val = float(cab.get("porc_dto", 0) or 0)
-            dto_str = f"{porc_dto_val:g}%"
-            st.subheader(f"#{remito_id}  |  Cliente: {cab['razon_social']} (Boca {cab['boca']})  |  Dto. {dto_str}")
 
             if f"recepcion_el_dia_{remito_id}" not in st.session_state:
                 st.session_state[f"recepcion_el_dia_{remito_id}"] = False
 
             is_recepcion_dia = bool(st.session_state[f"recepcion_el_dia_{remito_id}"])
+
+            if is_recepcion_dia:
+                st.success("Los Cambios afectarán al REMITO ORIGINAL reemplazando al anterior. Las VENTAS quedan pendientes a la Próxima Recepción.")
+
+            porc_dto_val = float(cab.get("porc_dto", 0) or 0)
+            dto_str = f"{porc_dto_val:g}%"
+            st.subheader(f"#{remito_id}  |  Cliente: {cab['razon_social']} (Boca {cab['boca']})  |  Dto. {dto_str}")
             habia_fecha_previa = cab.get("fecha_retiro") is not None
 
             if is_recepcion_dia:
@@ -189,14 +200,17 @@ def remitos_ventas():
                 if f"fecha_retiro_{remito_id}" in st.session_state:
                     st.session_state[f"fecha_retiro_{remito_id}"] = None
 
+            # Un remito se considera "cerrado" si ya tiene registrada una fecha de retiro previa
+            es_remito_cerrado = (cab.get("fecha_retiro") is not None)
+
             col_izq, col_der = st.columns(2, gap="small")
 
             with col_izq:
-                st.date_input(
+                nueva_fecha_entrega = st.date_input(
                     "Fecha de Entrega", 
-                    value=cab["fecha_entrega"], 
+                    value=cab.get("fecha_entrega"), 
                     format="DD/MM/YYYY", 
-                    disabled=True,
+                    disabled=es_remito_cerrado or st.session_state.is_form_disabled,
                     key=f"fecha_entrega_{remito_id}"
                 )
                 if is_recepcion_dia:
@@ -211,15 +225,15 @@ def remitos_ventas():
                     if habia_fecha_previa:
                         st.warning("⚠️ Recepción en el Día: La Fecha de Retiro quedará en blanco.")
                 else:
-                    fecha_entrega_val = cab.get("fecha_entrega")
+                    fecha_entrega_ref = nueva_fecha_entrega if nueva_fecha_entrega else cab.get("fecha_entrega")
                     val_fecha_ret = cab.get("fecha_retiro")
-                    if val_fecha_ret and fecha_entrega_val and val_fecha_ret < fecha_entrega_val:
-                        val_fecha_ret = fecha_entrega_val
+                    if val_fecha_ret and fecha_entrega_ref and val_fecha_ret < fecha_entrega_ref:
+                        val_fecha_ret = fecha_entrega_ref
 
                     nueva_fecha_retiro = st.date_input(
                         "Fecha de Retiro",
                         value=val_fecha_ret,
-                        min_value=fecha_entrega_val,
+                        min_value=fecha_entrega_ref,
                         format="DD/MM/YYYY",
                         key=f"fecha_retiro_{remito_id}",
                         disabled=st.session_state.is_form_disabled
@@ -262,7 +276,6 @@ def remitos_ventas():
                 )
 
                 if should_preload:
-                    rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
                     st.session_state.articulo_precargado_rec = articulo_sel
 
                     # Pre-cargar datos si el artículo existe en los items actuales
@@ -280,7 +293,6 @@ def remitos_ventas():
                             st.session_state.observaciones_item_input_rec = ""
                         else:
                             st.session_state.precio_real_input_rec = 0.0
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.session_state.focus_target = "entregados"
                     st.rerun()
 
@@ -326,19 +338,15 @@ def remitos_ventas():
                 )
 
             if add_clicked:
-                rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
                 if items_key in st.session_state and not st.session_state[items_key].empty and articulo_sel in st.session_state[items_key]['nro_articulo'].values:
                     st.session_state.item_rec_message = ("warning", "⚠️ No puede ser agregado. Item existente en el Remito!")
                     st.session_state.should_clear_items_rec = True
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 elif st.session_state.entregados_input_rec < 1:
                     st.session_state.item_rec_message = ("error", "⚠️ La cantidad entregada debe ser 1 o mayor.")
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 elif st.session_state.precio_real_input_rec <= 0:
                     st.session_state.item_rec_message = ("error", "⚠️ El precio real debe ser mayor a cero.")
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 else:
                     matching = st.session_state.articulos_df.loc[st.session_state.articulos_df['nro_articulo'] == articulo_sel]
@@ -349,7 +357,6 @@ def remitos_ventas():
                         precio_neto_input = st.session_state.precio_real_input_rec * (1.0 - (porc_dto_val / 100.0))
                         if precio_neto_input < costo_val:
                             st.session_state.item_rec_message = ("error", f"⚠️ El Precio Real (\${st.session_state.precio_real_input_rec:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${precio_neto_input:,.2f} vs Costo: \${costo_val:,.2f}).")
-                            st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                             st.rerun()
 
                         new_row = pd.DataFrame([{
@@ -365,15 +372,12 @@ def remitos_ventas():
                         st.session_state[items_key] = pd.concat([st.session_state[items_key], new_row], ignore_index=True)
                         st.session_state.remito_saved = False
                         st.session_state.should_clear_items_rec = True
-                        st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                         st.rerun()
 
             if del_clicked:
-                rec_dia_curr = st.session_state.get(f"recepcion_el_dia_{remito_id}", False)
                 if items_key in st.session_state and (st.session_state[items_key].empty or articulo_sel not in st.session_state[items_key]['nro_articulo'].values):
                     st.session_state.item_rec_message = ("warning", "⚠️ No puede ser eliminado. Item inexistente en el Remito!")
                     st.session_state.should_clear_items_rec = True
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
                 else:
                     st.session_state[items_key] = st.session_state[items_key][
@@ -382,7 +386,6 @@ def remitos_ventas():
                     st.session_state.remito_saved = False
                     st.session_state.item_rec_message = ("warning", "Artículo eliminado")
                     st.session_state.should_clear_items_rec = True
-                    st.session_state[f"recepcion_el_dia_{remito_id}"] = rec_dia_curr
                     st.rerun()
 
             if "item_rec_message" in st.session_state and st.session_state.item_rec_message:
@@ -395,17 +398,14 @@ def remitos_ventas():
                     st.success(msg_text)
                 del st.session_state.item_rec_message
 
-            col_head1, col_head2 = st.columns([4, 1], gap="small", vertical_alignment="center")
-            with col_head1:
-                st.subheader(f"Items del Remito #{remito_id}")
-            with col_head2:
-                st.checkbox("Recepción en el Día", key=f"recepcion_el_dia_{remito_id}", disabled=st.session_state.is_form_disabled)
-
-            if st.session_state.get(f"recepcion_el_dia_{remito_id}", False):
-                st.success("Los Cambios afectarán al REMITO ORIGINAL reemplazando al anterior. Las VENTAS quedan pendientes a la Próxima Recepción.")
+            st.subheader(f"Items del Remito #{remito_id}")
 
             col_edit, col_calc = st.columns([4, 1], gap="small")
             
+            num_items_rec = len(st.session_state[items_key]) if items_key in st.session_state else 0
+            rows_to_show = min(max(num_items_rec, 1), 10)
+            grid_height = int(39 + (rows_to_show * 35.5) + 4)
+
             with col_edit:
                 st.markdown("#### Editar Devoluciones y Observaciones")
                 
@@ -414,6 +414,7 @@ def remitos_ventas():
                     st.session_state[items_key],
                     hide_index=True,
                     width="stretch",
+                    height=grid_height,
                     column_order=["nro_articulo", "descripcion", "precio_real", "entregados", "devueltos", "observaciones"],
                     column_config={
                         "nro_articulo": st.column_config.TextColumn("Artículo", disabled=True, width="small"),
@@ -503,17 +504,23 @@ def remitos_ventas():
             except Exception as e:
                 st.error(f"Error en validación: {str(e)}")
 
-            # Validar Fecha de Retiro según si es Recepción en el Día
+            # Validar Fecha de Retiro y Fecha de Entrega según si es Recepción en el Día
             is_recepcion_dia_current = bool(st.session_state.get(f"recepcion_el_dia_{remito_id}", False))
+            fecha_entrega_error = False
+            fecha_retiro_error = False
+
+            f_entrega = nueva_fecha_entrega if nueva_fecha_entrega else cab.get("fecha_entrega")
+            if not f_entrega:
+                fecha_entrega_error = True
+                st.warning("⚠️ Debe ingresar una Fecha de Entrega válida.")
 
             if is_recepcion_dia_current:
                 nueva_fecha_retiro = None
                 fecha_retiro_error = False
             else:
-                f_entrega = cab.get("fecha_entrega")
                 if nueva_fecha_retiro is None:
                     fecha_retiro_error = True
-                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro para realizar la Recepción.")
+                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro antes de actualizar el Remito o, marcar la casilla de 'Recepción en el Día'.")
                 elif f_entrega and nueva_fecha_retiro < f_entrega:
                     fecha_retiro_error = True
                     f_ent_str = f_entrega.strftime("%d/%m/%Y") if hasattr(f_entrega, "strftime") else str(f_entrega)
@@ -537,6 +544,7 @@ def remitos_ventas():
                         vendidos_df,
                         hide_index=True,
                         width="stretch",
+                        height=grid_height,
                         column_config={
                             "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
                         }
@@ -598,7 +606,7 @@ def remitos_ventas():
             st.header("Acciones del Remito")
 
             # Verificar que no haya errores de validación
-            tiene_errores = df_editado.empty or not items_invalidos.empty or not items_precio_invalidos.empty or not items_entregados_invalidos.empty or not items_precio_menor_costo.empty or fecha_retiro_error
+            tiene_errores = df_editado.empty or not items_invalidos.empty or not items_precio_invalidos.empty or not items_entregados_invalidos.empty or not items_precio_menor_costo.empty or fecha_retiro_error or fecha_entrega_error
             is_remito_saved = st.session_state.remito_saved
             is_excel_saved = st.session_state.excel_saved
             can_save = not tiene_errores  # En ventas, solo necesitamos que no haya errores
@@ -614,12 +622,19 @@ def remitos_ventas():
                         say_error = True
                     else:
                         try:
+                            fe_to_update = nueva_fecha_entrega if not es_remito_cerrado else None
                             update_remito_data(
                                 remito_id=remito_id,
                                 fecha_retiro=nueva_fecha_retiro,
                                 observaciones_cabecera=nuevas_observaciones,
-                                items_df=df_editado
+                                items_df=df_editado,
+                                fecha_entrega=fe_to_update
                             )
+                            if fe_to_update:
+                                cab["fecha_entrega"] = fe_to_update
+                            if nueva_fecha_retiro is not None:
+                                cab["fecha_retiro"] = nueva_fecha_retiro
+
                             st.session_state.remito_saved = True
                             st.session_state.success_shown = False  # Para mostrar el mensaje
                             # Forzar rerun para actualizar el estado de los botones
@@ -705,7 +720,7 @@ def remitos_ventas():
             if st.session_state.show_confirm_modal:
                 st.warning("¿Desea continuar y cargar un nuevo remito? Se perderán los cambios no guardados.")
 
-                col_confirm, col_cancel, _ = st.columns([1, 1, 1], gap="small")
+                col_confirm, col_cancel = st.columns(2, gap="small")
 
                 with col_confirm:
                     if st.button("Sí, continuar ⚠️", width="stretch"):

@@ -10,8 +10,6 @@ from models import (
 )
 from gen_remito import gen_remito, process_generate_remito, is_local_app, get_remito_filename
 
-st.set_page_config(layout="wide")
-
 def clear_item_inputs():
     """Reinicia los valores de los inputs de items manteniendo la clave del selectbox."""
     st.session_state.entregados_input = 1
@@ -415,10 +413,15 @@ def remitos_entregas():
     st.header("Items actuales del Remito")
 
     if not st.session_state.items_data.empty:
+        num_items_ent = len(st.session_state.items_data)
+        rows_to_show_ent = min(max(num_items_ent, 1), 10)
+        grid_height_ent = int(39 + (rows_to_show_ent * 35.5) + 4)
         # Se muestra el dataframe sin edición
         st.dataframe(
             st.session_state.items_data[['Articulo', 'Descripción', 'Precio Real', 'Entregados', 'Observaciones']],
             hide_index=True,
+            width="stretch",
+            height=grid_height_ent,
             column_config={
                 "Articulo": st.column_config.Column(width="medium"),
                 "Descripción": st.column_config.Column(width="medium"),
@@ -561,7 +564,7 @@ def remitos_entregas():
     if st.session_state.show_confirm_modal:
         st.warning("Hay artículos cargados en la grilla. ¿Desea continuar y borrar todos los datos del remito?")
 
-        col_confirm, col_cancel, _ = st.columns([1, 1, 1], gap="small")
+        col_confirm, col_cancel = st.columns(2, gap="small")
 
         with col_confirm:
             if st.button("Sí, continuar ⚠️", width="stretch"):

@@ -96,7 +96,7 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
 
         st.dataframe(
             resumen_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=False,
             column_config=column_cfg
         )
@@ -136,7 +136,7 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
         col: st.column_config.Column(disabled=True)
         for col in totales_df.columns
     }
-    st.dataframe(totales_df, use_container_width=True, hide_index=True, column_config=totales_column_cfg)
+    st.dataframe(totales_df, width="stretch", hide_index=True, column_config=totales_column_cfg)
 
     # Botón de Cerrar Resúmen
     if st.button("Cerrar Resúmen", type="primary", width="stretch"):

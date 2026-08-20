@@ -119,10 +119,6 @@ def on_del_click():
 
 def clientes_crud():
 
-    st.set_page_config(
-        layout="wide"
-    )
-
     st.title(config.TITULO_APP)
 
     if not "view_grilla" in st.session_state:

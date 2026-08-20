@@ -8,7 +8,6 @@ import config
 import time
 
 def remitos_anulaciones():
-    st.set_page_config(layout="wide")
     st.title(config.TITULO_APP)
     st.header("Anulación de Remitos")
 

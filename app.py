@@ -1,6 +1,12 @@
 import streamlit as st
-from streamlit_option_menu import option_menu
+import config
 
+st.set_page_config(
+    page_title=config.TITULO_APP,
+    layout="wide"
+)
+
+from streamlit_option_menu import option_menu
 from gen_barcode import gen_barcode
 from update_art import update_art
 from clientes import clientes_crud
@@ -11,7 +17,6 @@ import remitos_entregas as rem_ent
 import sys, os, time, traceback
 import datetime
 import models
-import config
 
 # This will create the engine
 # TITLE -- coding utf-8 --
@@ -34,12 +39,11 @@ def whereami():
 RUTASCRIPT = whereami()
 
 def app():
-    # Detectar si la URL contiene /carga_movil en la ruta y forzar ?page=carga_movil
     st.components.v1.html(
         """
         <script>
             (function() {
-                const parentDoc = window.parent.document;
+                const parentDoc = window.parent ? window.parent.document : document;
                 if (parentDoc && parentDoc.documentElement) {
                     parentDoc.documentElement.lang = 'es';
                 }
@@ -49,6 +53,51 @@ def app():
                     const searchParams = new URLSearchParams(window.parent.location.search);
                     searchParams.set("page", "carga_movil");
                     window.parent.location.search = searchParams.toString();
+                }
+
+                function selectAll(el) {
+                    if (!el) return;
+                    try {
+                        if (el.type === 'number') {
+                            el.type = 'text';
+                            el.select();
+                            el.setSelectionRange(0, 9999);
+                            const restoreNumber = function() {
+                                el.type = 'number';
+                                el.removeEventListener('blur', restoreNumber);
+                            };
+                            el.addEventListener('blur', restoreNumber);
+                        } else {
+                            el.select();
+                            el.setSelectionRange(0, 9999);
+                        }
+                    } catch(e) {
+                        try { el.select(); } catch(err) {}
+                    }
+                }
+
+                function attachAutoSelect() {
+                    const inputs = parentDoc.querySelectorAll('input[type="text"], input[type="number"]');
+                    inputs.forEach(input => {
+                        if (!input.dataset.autoSelectAttached) {
+                            input.dataset.autoSelectAttached = "true";
+                            const handler = function() {
+                                const el = this;
+                                setTimeout(() => selectAll(el), 30);
+                            };
+                            input.addEventListener('focus', handler);
+                            input.addEventListener('click', handler);
+                            input.addEventListener('mousedown', function() {
+                                const el = this;
+                                setTimeout(() => selectAll(el), 50);
+                            });
+                        }
+                    });
+                }
+
+                attachAutoSelect();
+                if (!window.parent._autoSelectTimer) {
+                    window.parent._autoSelectTimer = setInterval(attachAutoSelect, 300);
                 }
             })();
         </script>
@@ -97,7 +146,7 @@ def app():
         )
 
         # Botón arriba de todo para recargar la navegación
-        if st.button("🔄 Recargar Menús", use_container_width=True, help="Refresca la navegación"):
+        if st.button("🔄 Recargar Menús", width="stretch", help="Refresca la navegación"):
             st.session_state.menu_version = st.session_state.get("menu_version", 0) + 1
             st.session_state.currentpage = 'Codigos de Barra'
             for k in ["remitos_sub_nav", "articulos_sub_nav", "informes_sub_nav", "backup_sub_nav"]:
@@ -166,14 +215,14 @@ def app():
                 st.session_state.pop(clave, None)
 
         if mainmenu == "Remitos":
-            rem_options = ["Entregas", "Recepciones", "Carga Móvil", "Anulaciones"]
+            rem_options = ["Entregas", "Recepciones", "Consultas", "Carga Móvil", "Anulaciones"]
             cur_rem_sub = st.session_state.get("remitos_sub_nav", "Entregas")
             def_rem_idx = rem_options.index(cur_rem_sub) if cur_rem_sub in rem_options else 0
             if "remitos_sub_nav" not in st.session_state or not st.session_state["remitos_sub_nav"]:
                 st.session_state["remitos_sub_nav"] = cur_rem_sub
             submenu = option_menu(menu_title="Remitos",
                                   options=rem_options,
-                                  icons=["file-earmark-plus", "file-earmark-plus", "phone", "file-earmark-plus"],
+                                  icons=["file-earmark-plus", "file-earmark-plus", "search", "phone", "file-earmark-plus"],
                                   menu_icon="folder", default_index=def_rem_idx, orientation="vertical",
                                   styles=submenu_styles,
                                   key=f"remitos_sub_nav_{menu_v}")
@@ -259,6 +308,9 @@ def app():
             rem_ent.remitos_entregas()
         elif submenu == "Recepciones":
             remitos_ventas()
+        elif submenu == "Consultas":
+            from remitos_consultas import remitos_consultas
+            remitos_consultas()
         elif submenu == "Carga Móvil":
             from remitos_ventas_movil import remitos_ventas_movil
             remitos_ventas_movil()

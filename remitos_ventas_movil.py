@@ -288,8 +288,16 @@ def remitos_ventas_movil():
                 if f"f_ret_m_{remito_id}" in st.session_state:
                     st.session_state[f"f_ret_m_{remito_id}"] = None
 
+            es_remito_cerrado = (cab.get("fecha_retiro") is not None)
+
             # Fechas y Recepción en el día
-            st.date_input("Fecha de Entrega", value=cab["fecha_entrega"], format="DD/MM/YYYY", disabled=True, key=f"f_ent_m_{remito_id}")
+            nueva_fecha_entrega = st.date_input(
+                "Fecha de Entrega", 
+                value=cab.get("fecha_entrega"), 
+                format="DD/MM/YYYY", 
+                disabled=es_remito_cerrado or st.session_state.is_form_disabled_movil, 
+                key=f"f_ent_m_{remito_id}"
+            )
 
             if is_recepcion_dia:
                 nueva_fecha_retiro = None
@@ -297,15 +305,15 @@ def remitos_ventas_movil():
                 if habia_fecha_previa:
                     st.warning("⚠️ Recepción en el Día: La Fecha de Retiro quedará en blanco.")
             else:
-                fecha_entrega_val = cab.get("fecha_entrega")
+                fecha_entrega_ref = nueva_fecha_entrega if nueva_fecha_entrega else cab.get("fecha_entrega")
                 val_fecha_ret = cab.get("fecha_retiro")
-                if val_fecha_ret and fecha_entrega_val and val_fecha_ret < fecha_entrega_val:
-                    val_fecha_ret = fecha_entrega_val
+                if val_fecha_ret and fecha_entrega_ref and val_fecha_ret < fecha_entrega_ref:
+                    val_fecha_ret = fecha_entrega_ref
 
                 nueva_fecha_retiro = st.date_input(
                     "Fecha de Retiro",
                     value=val_fecha_ret,
-                    min_value=fecha_entrega_val,
+                    min_value=fecha_entrega_ref,
                     format="DD/MM/YYYY",
                     key=f"f_ret_m_{remito_id}",
                     disabled=st.session_state.is_form_disabled_movil
@@ -530,7 +538,7 @@ def remitos_ventas_movil():
                 f_entrega = cab.get("fecha_entrega")
                 if nueva_fecha_retiro is None:
                     fecha_retiro_error = True
-                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro para realizar la Recepción.")
+                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro antes de actualizar el Remito o, marcar la casilla de 'Recepción en el Día'.")
                 elif f_entrega and nueva_fecha_retiro < f_entrega:
                     fecha_retiro_error = True
                     st.warning("⚠️ La Fecha de Retiro no puede ser anterior a la Fecha de Entrega.")
@@ -566,7 +574,7 @@ def remitos_ventas_movil():
                 "Devueltos": t_dev,
                 "Vendidos": t_vend
             }])
-            st.dataframe(totales_df, use_container_width=True, hide_index=True)
+            st.dataframe(totales_df, width="stretch", hide_index=True)
 
             # === Acciones Principales ===
             st.subheader("Acciones del Remito")
@@ -604,7 +612,19 @@ def remitos_ventas_movil():
 
             if st.button("Actualizar Datos Remito", type="primary" if not is_remito_saved else "secondary", width="stretch", disabled=st.session_state.is_form_disabled_movil or is_remito_saved or is_excel_saved or tiene_errores):
                 try:
-                    update_remito_data(remito_id=remito_id, fecha_retiro=nueva_fecha_retiro, observaciones_cabecera=nuevas_observaciones, items_df=df_items)
+                    fe_to_update = nueva_fecha_entrega if not es_remito_cerrado else None
+                    update_remito_data(
+                        remito_id=remito_id, 
+                        fecha_retiro=nueva_fecha_retiro, 
+                        observaciones_cabecera=nuevas_observaciones, 
+                        items_df=df_items,
+                        fecha_entrega=fe_to_update
+                    )
+                    if fe_to_update:
+                        cab["fecha_entrega"] = fe_to_update
+                    if nueva_fecha_retiro is not None:
+                        cab["fecha_retiro"] = nueva_fecha_retiro
+
                     st.session_state.remito_saved_movil = True
                     st.success("✅ Datos del remito actualizados correctamente.")
                     st.rerun()
