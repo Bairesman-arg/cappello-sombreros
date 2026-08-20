@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from openpyxl.utils import get_column_letter
 
-VERSION = "1.0.52"
+VERSION = "1.1.52"
 TITULO_APP = f"🧢 SISTEMA CAPELLO vs {VERSION}"
 # TITULO_APP = "INTRODUCCION A PYTHON"
 FOOTER_APP = "Sistema Capello® - Powered by Python and Streamlit - Telegram: @Bairesman - 2026"
