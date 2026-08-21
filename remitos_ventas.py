@@ -4,13 +4,23 @@ import pandas as pd
 from datetime import date, datetime
 from models import get_remito_completo, update_remito_data, get_clients_and_articles
 
-def clear_item_inputs_rec(set_focus=False):
+def clear_item_inputs_rec(set_focus=False, remito_id=None):
     """Reinicia los valores de los inputs de items para recepciones."""
     st.session_state.entregados_input_rec = 1
     st.session_state.observaciones_item_input_rec = ""
     st.session_state.articulo_precargado_rec = None
     st.session_state.precio_real_input_rec = 0.0
     st.session_state.articulo_selectbox_rec = None
+    st.session_state.pop("pending_selected_item_rec", None)
+    if remito_id is not None:
+        st.session_state[f"view_items_grid_{remito_id}"] = True
+        st.session_state[f"item_selected_from_grid_{remito_id}"] = False
+    else:
+        for k in list(st.session_state.keys()):
+            if k.startswith("view_items_grid_"):
+                st.session_state[k] = True
+            elif k.startswith("item_selected_from_grid_"):
+                st.session_state[k] = False
     if set_focus:
         st.session_state.focus_target = "articulo"
     else:
@@ -84,7 +94,8 @@ def remitos_ventas():
 
     # Manejo de flags de rerun
     if st.session_state.get("should_clear_items_rec", False):
-        clear_item_inputs_rec(set_focus=True)
+        remito_id_to_clear = st.session_state.pop("remito_id_to_clear_rec", None)
+        clear_item_inputs_rec(set_focus=True, remito_id=remito_id_to_clear)
         st.session_state.should_clear_items_rec = False
 
     if st.session_state.should_reset_all:
@@ -185,6 +196,16 @@ def remitos_ventas():
             if f"recepcion_el_dia_{remito_id}" not in st.session_state:
                 st.session_state[f"recepcion_el_dia_{remito_id}"] = False
 
+            view_grid_key = f"view_items_grid_{remito_id}"
+            selected_from_grid_key = f"item_selected_from_grid_{remito_id}"
+            if view_grid_key not in st.session_state:
+                st.session_state[view_grid_key] = True
+            if selected_from_grid_key not in st.session_state:
+                st.session_state[selected_from_grid_key] = False
+
+            view_grilla_items = bool(st.session_state[view_grid_key])
+            item_selected_from_grid = bool(st.session_state[selected_from_grid_key])
+
             is_recepcion_dia = bool(st.session_state[f"recepcion_el_dia_{remito_id}"])
 
             if is_recepcion_dia:
@@ -251,9 +272,20 @@ def remitos_ventas():
             # === SECCIÓN CARGA Y ELIMINACIÓN DE ITEMS ===
             st.header("Carga y Eliminación de Items")
 
+            if "pending_selected_item_rec" in st.session_state:
+                pending = st.session_state.pop("pending_selected_item_rec")
+                if pending:
+                    st.session_state.articulo_selectbox_rec = pending.get("articulo_selectbox_rec")
+                    st.session_state.entregados_input_rec = pending.get("entregados_input_rec", 1)
+                    st.session_state.precio_real_input_rec = pending.get("precio_real_input_rec", 0.0)
+                    st.session_state.observaciones_item_input_rec = pending.get("observaciones_item_input_rec", "")
+                    st.session_state.articulo_precargado_rec = pending.get("articulo_precargado_rec")
+
             articulo_options_full = st.session_state.articulos_df.apply(
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
+
+            is_item_input_disabled = st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items
 
             articulo_sel_full = st.selectbox(
                 f"Artículos para {cab['razon_social']}:",
@@ -261,12 +293,12 @@ def remitos_ventas():
                 index=None,
                 placeholder="Seleccione un artículo...",
                 key="articulo_selectbox_rec",
-                disabled=st.session_state.is_form_disabled,
+                disabled=is_item_input_disabled,
                 help="Seleccione un nuevo artículo o uno existente para agregar o eliminar."
             )
 
             articulo_sel = None
-            if articulo_sel_full and not st.session_state.is_form_disabled:
+            if articulo_sel_full and not is_item_input_disabled:
                 articulo_sel = articulo_sel_full.split(" - ")[0]
 
                 should_preload = (
@@ -295,6 +327,8 @@ def remitos_ventas():
                             st.session_state.precio_real_input_rec = 0.0
                     st.session_state.focus_target = "entregados"
                     st.rerun()
+            elif articulo_sel_full:
+                articulo_sel = articulo_sel_full.split(" - ")[0]
 
             col_entregados, col_precio, col_observ = st.columns([1, 1, 3], gap="small")
             with col_entregados:
@@ -303,7 +337,7 @@ def remitos_ventas():
                     min_value=1,
                     step=1,
                     key="entregados_input_rec",
-                    disabled=st.session_state.is_form_disabled
+                    disabled=is_item_input_disabled
                 )
             with col_precio:
                 st.number_input(
@@ -311,23 +345,23 @@ def remitos_ventas():
                     min_value=0.0,
                     step=500.0,
                     key="precio_real_input_rec",
-                    disabled=st.session_state.is_form_disabled
+                    disabled=is_item_input_disabled
                 )
             with col_observ:
                 st.text_input(
                     "Observaciones del Item:",
                     key="observaciones_item_input_rec",
-                    disabled=st.session_state.is_form_disabled
+                    disabled=is_item_input_disabled
                 )
 
-            # Botones de acción (Únicamente "Agregar Item ➕" y "Eliminar Item 🗑️")
-            c_btn1, c_btn2 = st.columns(2, gap="small")
+            # Botones de acción ("Agregar Item ➕", "Eliminar Item 🗑️" y "Limpiar Formulario 🔄")
+            c_btn1, c_btn2, c_btn3 = st.columns(3, gap="small")
 
             with c_btn1:
                 add_clicked = st.button(
                     "Agregar Item ➕",
                     width="stretch",
-                    disabled=(articulo_sel is None or st.session_state.is_form_disabled)
+                    disabled=(articulo_sel is None or st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items)
                 )
 
             with c_btn2:
@@ -337,10 +371,23 @@ def remitos_ventas():
                     disabled=(articulo_sel is None or st.session_state.is_form_disabled)
                 )
 
+            with c_btn3:
+                clear_form_clicked = st.button(
+                    "Limpiar Formulario 🔄",
+                    width="stretch",
+                    disabled=(view_grilla_items or st.session_state.is_form_disabled)
+                )
+
+            if clear_form_clicked:
+                st.session_state.should_clear_items_rec = True
+                st.session_state.remito_id_to_clear_rec = remito_id
+                st.rerun()
+
             if add_clicked:
                 if items_key in st.session_state and not st.session_state[items_key].empty and articulo_sel in st.session_state[items_key]['nro_articulo'].values:
                     st.session_state.item_rec_message = ("warning", "⚠️ No puede ser agregado. Item existente en el Remito!")
                     st.session_state.should_clear_items_rec = True
+                    st.session_state.remito_id_to_clear_rec = remito_id
                     st.rerun()
                 elif st.session_state.entregados_input_rec < 1:
                     st.session_state.item_rec_message = ("error", "⚠️ La cantidad entregada debe ser 1 o mayor.")
@@ -372,12 +419,14 @@ def remitos_ventas():
                         st.session_state[items_key] = pd.concat([st.session_state[items_key], new_row], ignore_index=True)
                         st.session_state.remito_saved = False
                         st.session_state.should_clear_items_rec = True
+                        st.session_state.remito_id_to_clear_rec = remito_id
                         st.rerun()
 
             if del_clicked:
                 if items_key in st.session_state and (st.session_state[items_key].empty or articulo_sel not in st.session_state[items_key]['nro_articulo'].values):
                     st.session_state.item_rec_message = ("warning", "⚠️ No puede ser eliminado. Item inexistente en el Remito!")
                     st.session_state.should_clear_items_rec = True
+                    st.session_state.remito_id_to_clear_rec = remito_id
                     st.rerun()
                 else:
                     st.session_state[items_key] = st.session_state[items_key][
@@ -386,6 +435,7 @@ def remitos_ventas():
                     st.session_state.remito_saved = False
                     st.session_state.item_rec_message = ("warning", "Artículo eliminado")
                     st.session_state.should_clear_items_rec = True
+                    st.session_state.remito_id_to_clear_rec = remito_id
                     st.rerun()
 
             if "item_rec_message" in st.session_state and st.session_state.item_rec_message:
@@ -398,66 +448,104 @@ def remitos_ventas():
                     st.success(msg_text)
                 del st.session_state.item_rec_message
 
-            st.subheader(f"Items del Remito #{remito_id}")
+            grid_ver_key = f"rec_grid_version_{remito_id}"
+            grid_ver = st.session_state.get(grid_ver_key, 0)
+            editor_key = f"editor_{remito_id}_{grid_ver}"
 
-            col_edit, col_calc = st.columns([4, 1], gap="small")
-            
-            num_items_rec = len(st.session_state[items_key]) if items_key in st.session_state else 0
-            rows_to_show = min(max(num_items_rec, 1), 10)
-            grid_height = int(39 + (rows_to_show * 35.5) + 4)
+            if view_grilla_items:
+                st.subheader(f"Items del Remito #{remito_id}")
+                st.markdown("`Seleccione la primera columna de la grilla inferior para modificar o eliminar`")
 
-            with col_edit:
-                st.markdown("#### Editar Devoluciones y Observaciones")
+                col_edit, col_calc = st.columns([4, 1], gap="small")
                 
-                # Grilla editable principal SIN callback
-                st.data_editor(
-                    st.session_state[items_key],
-                    hide_index=True,
-                    width="stretch",
-                    height=grid_height,
-                    column_order=["nro_articulo", "descripcion", "precio_real", "entregados", "devueltos", "observaciones"],
-                    column_config={
-                        "nro_articulo": st.column_config.TextColumn("Artículo", disabled=True, width="small"),
-                        "descripcion": st.column_config.TextColumn("Descripción", disabled=True, width="medium"),
-                        "precio_real": st.column_config.NumberColumn(
-                            "Precio Real",
-                            min_value=0.01,
-                            step=100.0,
-                            format="$%.2f",
-                            width="small"
-                        ),
-                        "entregados": st.column_config.NumberColumn(
-                            "Entregados",
-                            min_value=1,
-                            step=1,
-                            width="small"
-                        ),
-                        "devueltos": st.column_config.NumberColumn(
-                            "devueltos", 
-                            min_value=0,
-                            step=1,
-                            width="small"
-                        ),
-                        "Observaciones": st.column_config.TextColumn("observaciones", width="medium"),
-                    },
-                    disabled=["nro_articulo", "descripcion"] + (["precio_real", "entregados", "devueltos", "observaciones"] if st.session_state.is_form_disabled else []),
-                    key=f"editor_{remito_id}",
-                    num_rows="fixed"
-                )
-                
-            # Obtener datos actuales del editor DESPUÉS del data_editor
-            editor_key = f"editor_{remito_id}"
-            df_editado = st.session_state[items_key].copy()  # Empezar con datos originales
-            
-            if editor_key in st.session_state:
-                editor_changes = st.session_state[editor_key]
-                
-                # Aplicar los cambios editados al DataFrame
-                if isinstance(editor_changes, dict) and 'edited_rows' in editor_changes:
-                    edited_rows = editor_changes['edited_rows']
-                    for row_idx, changes in edited_rows.items():
-                        for col_name, new_value in changes.items():
-                            df_editado.loc[row_idx, col_name] = new_value
+                num_items_rec = len(st.session_state[items_key]) if items_key in st.session_state else 0
+                rows_to_show = min(max(num_items_rec, 1), 10)
+                grid_height = int(39 + (rows_to_show * 35.5) + 4)
+
+                with col_edit:
+                    st.markdown("#### Editar Devoluciones y Observaciones")
+                    
+                    df_to_show = st.session_state[items_key].copy().reset_index(drop=True)
+                    if "Seleccionado" not in df_to_show.columns:
+                        df_to_show.insert(0, "Seleccionado", False)
+
+                    disabled_cols = ["nro_articulo", "descripcion"]
+                    if st.session_state.is_form_disabled:
+                        disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"] + ["Seleccionado"]
+
+                    edited_df = st.data_editor(
+                        df_to_show,
+                        hide_index=True,
+                        width="stretch",
+                        height=grid_height,
+                        column_order=["Seleccionado", "nro_articulo", "descripcion", "precio_real", "entregados", "devueltos", "observaciones"],
+                        column_config={
+                            "Seleccionado": st.column_config.CheckboxColumn(
+                                "✔",
+                                help="Marque la casilla de verificación para editar o eliminar este artículo.",
+                                width=40
+                            ),
+                            "nro_articulo": st.column_config.TextColumn("Artículo", disabled=True, width="small"),
+                            "descripcion": st.column_config.TextColumn("Descripción", disabled=True, width="medium"),
+                            "precio_real": st.column_config.NumberColumn(
+                                "Precio Real",
+                                min_value=0.01,
+                                step=100.0,
+                                format="$%.2f",
+                                width="small"
+                            ),
+                            "entregados": st.column_config.NumberColumn(
+                                "Entregados",
+                                min_value=1,
+                                step=1,
+                                width="small"
+                            ),
+                            "devueltos": st.column_config.NumberColumn(
+                                "devueltos", 
+                                min_value=0,
+                                step=1,
+                                width="small"
+                            ),
+                            "observaciones": st.column_config.TextColumn("observaciones", width="medium"),
+                        },
+                        disabled=disabled_cols,
+                        key=editor_key,
+                        num_rows="fixed"
+                    )
+
+                if editor_key in st.session_state:
+                    editor_changes = st.session_state[editor_key]
+                    if isinstance(editor_changes, dict) and 'edited_rows' in editor_changes:
+                        edited_rows = editor_changes['edited_rows']
+                        for row_idx, changes in edited_rows.items():
+                            for col_name, new_value in changes.items():
+                                if col_name != "Seleccionado" and col_name in st.session_state[items_key].columns:
+                                    st.session_state[items_key].loc[row_idx, col_name] = new_value
+
+                if "Seleccionado" in edited_df.columns:
+                    selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
+                    if selected_idxs:
+                        idx = selected_idxs[0]
+                        selected_row = edited_df.loc[idx]
+                        nro_art = selected_row["nro_articulo"]
+
+                        matching_opts = [opt for opt in articulo_options_full if opt.startswith(f"{nro_art} - ")]
+                        sel_option = matching_opts[0] if matching_opts else None
+
+                        st.session_state.pending_selected_item_rec = {
+                            "articulo_selectbox_rec": sel_option,
+                            "entregados_input_rec": int(selected_row["entregados"]),
+                            "precio_real_input_rec": float(selected_row["precio_real"]),
+                            "observaciones_item_input_rec": str(selected_row["observaciones"]) if pd.notna(selected_row["observaciones"]) else "",
+                            "articulo_precargado_rec": nro_art
+                        }
+
+                        st.session_state[selected_from_grid_key] = True
+                        st.session_state[view_grid_key] = False
+                        st.session_state[grid_ver_key] = grid_ver + 1
+                        st.rerun()
+
+            df_editado = st.session_state[items_key].copy()
             
             # VALIDAR grilla
             items_invalidos = pd.DataFrame()
@@ -529,28 +617,29 @@ def remitos_ventas():
                 else:
                     fecha_retiro_error = False
 
-            with col_calc:
-                st.markdown("#### Vendidos")
-                
-                # Calcular vendidos como Entregados - Devueltos todo el tiempo
-                if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
-                    devueltos_clean = df_editado["devueltos"].fillna(0).astype(int)
-                    entregados_clean = df_editado["entregados"].fillna(0).astype(int)
-                    vendidos_valores = (entregados_clean - devueltos_clean).clip(lower=0)
-
-                    vendidos_df = pd.DataFrame({"Vendidos": vendidos_valores})
+            if view_grilla_items:
+                with col_calc:
+                    st.markdown("#### Vendidos")
                     
-                    st.dataframe(
-                        vendidos_df,
-                        hide_index=True,
-                        width="stretch",
-                        height=grid_height,
-                        column_config={
-                            "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
-                        }
-                    )
-                else:
-                    st.info("Datos no disponibles")
+                    # Calcular vendidos como Entregados - Devueltos todo el tiempo
+                    if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
+                        devueltos_clean = df_editado["devueltos"].fillna(0).astype(int)
+                        entregados_clean = df_editado["entregados"].fillna(0).astype(int)
+                        vendidos_valores = (entregados_clean - devueltos_clean).clip(lower=0)
+
+                        vendidos_df = pd.DataFrame({"Vendidos": vendidos_valores})
+                        
+                        st.dataframe(
+                            vendidos_df,
+                            hide_index=True,
+                            width="stretch",
+                            height=grid_height,
+                            column_config={
+                                "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
+                            }
+                        )
+                    else:
+                        st.info("Datos no disponibles")
 
             # --- Totales y Utilidades ---
             total_entregados = 0
