@@ -23,6 +23,7 @@ def format_fecha(val):
     except Exception:
         return ""
 
+@st.cache_data(show_spinner=False)
 def get_consultas_df():
     """Consulta la base de datos para obtener el listado completo de remitos."""
     query = text("""
@@ -62,6 +63,7 @@ def get_consultas_df():
 
     return df
 
+@st.cache_data(show_spinner=False)
 def get_items_remito_df_and_utility(remito_id):
     """Obtiene el detalle de artículos de un remito y calcula la utilidad total del remito."""
     datos = get_remito_completo(remito_id)
@@ -97,6 +99,7 @@ def get_items_remito_df_and_utility(remito_id):
     utilidad_total = float(sum(utilidades))
     return resumen_df, utilidad_total
 
+@st.cache_data(show_spinner=False)
 def generar_excel_remitos(df_remitos):
     """Genera el libro Excel TodosLosRemitos_aaammdd.xlsx con cabeceras de remitos e ítems anidados en columna 2 (en 1 consulta optimizada)."""
     if df_remitos.empty:
@@ -229,9 +232,10 @@ def remitos_consultas():
     if df.empty:
         st.info("No hay remitos registrados en el sistema.")
     else:
+        search_ver = st.session_state.get("consultas_search_version", 0)
         current_query = st.session_state.get("consultas_search_query", "")
 
-        if current_query.strip():
+        if str(current_query).strip():
             col_search, col_clear, col_filtrar, col_excel = st.columns([2.85, 0.35, 1, 1.1], gap="small")
         else:
             col_search, col_filtrar, col_excel = st.columns([3.2, 1, 1.1], gap="small")
@@ -243,19 +247,34 @@ def remitos_consultas():
                 value=current_query,
                 placeholder="Ingrese una Boca, Una Razón Social o parte, o una fecha de Entrega o Retiro...",
                 label_visibility="collapsed",
-                key="input_search_remitos"
+                key=f"input_search_remitos_{search_ver}"
             )
 
         if col_clear:
             with col_clear:
-                if st.button("❌", key="btn_clear_search_remitos", help="Limpiar búsqueda", width="stretch"):
+                if st.button("↩️", key="btn_clear_search_remitos", help="Limpiar búsqueda", width="stretch"):
                     st.session_state["consultas_search_query"] = ""
+                    st.session_state["consultas_search_version"] = search_ver + 1
+                    st.session_state["consultas_selected_idx"] = 0
+                    st.session_state["consultas_loading_filter"] = True
                     st.rerun()
 
         with col_filtrar:
             if st.button("Filtrar", width="stretch", type="primary", key="btn_filtrar_remitos"):
                 st.session_state["consultas_search_query"] = search_input
+                st.session_state["consultas_loading_filter"] = True
                 st.rerun()
+
+        filter_loading_placeholder = st.empty()
+        if st.session_state.get("consultas_loading_filter", False):
+            filter_loading_placeholder.markdown(
+                """
+                <div style='background-color: #052c16; border: 1px solid #065f46; border-radius: 6px; padding: 10px 14px; color: #34d399; font-weight: 500; font-family: "Source Code Pro", Consolas, monospace; font-size: 0.95rem; margin-top: 10px; margin-bottom: 10px; width: 100%;'>
+                    Un momento por favor...
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
         # Filtrado inteligente sobre el DataFrame (Boca, Razón Social, Fecha Entrega, Fecha Retiro)
         query_text = search_input.strip().lower()
@@ -272,7 +291,6 @@ def remitos_consultas():
         # Generar Excel optimizado para el listado actual con nombre #TodosLosRemitos_aaaammdd.xlsx
         excel_filename = f"#TodosLosRemitos_{dt_class.now().strftime('%Y%m%d')}.xlsx"
         excel_bytes = generar_excel_remitos(df_filtered if not df_filtered.empty else df)
-        excel_bytes = generar_excel_remitos(df_filtered if not df_filtered.empty else df)
 
         with col_excel:
             st.download_button(
@@ -283,6 +301,9 @@ def remitos_consultas():
                 width="stretch",
                 key="btn_excel_remitos"
             )
+
+        filter_loading_placeholder.empty()
+        st.session_state["consultas_loading_filter"] = False
 
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
@@ -325,7 +346,7 @@ def remitos_consultas():
                 height=grid_height,
                 on_select="rerun",
                 selection_mode="single-row",
-                key=f"grid_consultas_{curr_selected_idx}"
+                key="grid_consultas_remitos_main"
             )
 
             selected_rows = selection_event.selection.get("rows", [])

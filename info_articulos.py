@@ -298,7 +298,7 @@ def info_articulos_ranking():
         "🏷️ Utilidad por Rubro",
         "🏆 Top 10 vs Resto",
         "🏷️ Ganancia por Unidad ($/U)",
-        "📊 Concentración Pareto %"
+        "📊 Acumulado Pareto %"
     ])
 
     def mostrar_explicacion_e(titulo, texto, color_borde="#ff4b4b"):
@@ -512,13 +512,12 @@ def info_articulos_ranking():
         )
 
         # Línea horizontal de referencia en Y = 80% (roja punteada)
-        rule_80_y = alt.Chart(pd.DataFrame({'y': [80.0]})).mark_rule(
+        rule_80_y = alt.Chart(df_pareto).mark_rule(
             color='#ff4b4b',
             strokeDash=[4, 4],
             strokeWidth=2
-        ).encode(y='y:Q')
+        ).encode(y=alt.datum(80.0))
 
-        # Línea vertical de referencia en el artículo que alcanza el 80% (verde punteada)
         tot_articulos_catalogo = len(df_pareto)
         df_cutoff = df_pareto[df_pareto["pareto_pct"] >= 80.0]
 
@@ -528,33 +527,48 @@ def info_articulos_ranking():
             pct_catalogo_corte = round((pos_corte / tot_articulos_catalogo) * 100, 1) if tot_articulos_catalogo > 0 else 0
             pct_util_corte = df_cutoff.iloc[0]["pareto_pct"]
 
-            rule_80_x = alt.Chart(pd.DataFrame({'nro_articulo': [articulo_corte_80]})).mark_rule(
+            df_single_corte = df_pareto[df_pareto["nro_articulo"] == articulo_corte_80]
+
+            rule_80_y = alt.Chart(df_single_corte).mark_rule(
+                color='#ff4b4b',
+                strokeDash=[4, 4],
+                strokeWidth=2
+            ).encode(
+                y=alt.datum(80.0)
+            )
+
+            rule_80_x = alt.Chart(df_single_corte).mark_rule(
                 color='#00e676',
                 strokeDash=[4, 4],
                 strokeWidth=2
-            ).encode(x=alt.X('nro_articulo:N', sort=None))
+            ).encode(
+                x=alt.X("nro_articulo:N", sort=None)
+            )
 
-            text_annotation = alt.Chart(pd.DataFrame([{
-                'nro_articulo': articulo_corte_80,
-                'y': 20.0,
-                'texto': f"Corte 80% ({pct_catalogo_corte}% catálogo)"
-            }])).mark_text(
+            text_annotation = alt.Chart(df_single_corte).mark_text(
                 align='left',
-                dx=6,
-                dy=0,
+                dx=8,
+                dy=18,
                 color='#00e676',
                 fontSize=12,
                 fontWeight='bold'
             ).encode(
-                x=alt.X('nro_articulo:N', sort=None),
-                y='y:Q',
-                text='texto:N'
+                x=alt.X("nro_articulo:N", sort=None),
+                y=alt.Y("pareto_pct:Q"),
+                text=alt.value(f"Corte 80% ({pct_catalogo_corte}% catálogo)")
             )
 
-            chart_pareto_final = chart_pareto + rule_80_y + rule_80_x + text_annotation
+            chart_pareto_final = (chart_pareto + rule_80_y + rule_80_x + text_annotation).resolve_scale(x='shared', y='shared')
             explicacion_pareto = f"Aporta valor al aplicar el principio 80/20 de inventario ABC: El <b>{pct_catalogo_corte}%</b> de tu catálogo ({pos_corte} de {tot_articulos_catalogo} artículos) representa el <b>{pct_util_corte}%</b> de la utilidad total del mes."
         else:
-            chart_pareto_final = chart_pareto + rule_80_y
+            rule_80_y = alt.Chart(df_pareto).mark_rule(
+                color='#ff4b4b',
+                strokeDash=[4, 4],
+                strokeWidth=2
+            ).encode(
+                y=alt.datum(80.0)
+            )
+            chart_pareto_final = (chart_pareto + rule_80_y).resolve_scale(x='shared', y='shared')
             explicacion_pareto = "Aporta valor al aplicar el principio 80/20 de inventario ABC. Permite comprobar qué porcentaje exacto de tu catálogo representa el 80% de tus utilidades mensuales."
 
         st.altair_chart(chart_pareto_final, use_container_width=True)

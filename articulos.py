@@ -423,17 +423,33 @@ def articulos_crud():
     )
 
     st.subheader("Filtrar Artículos")
-    col_input, col_btn, col_excel = st.columns([2.4, 1.1, 0.9], gap="small", vertical_alignment="bottom")
+
+    search_ver = st.session_state.get("articulos_search_version", 0)
+    current_filter = st.session_state.get("frase_filtrada", "")
+
+    if str(current_filter).strip():
+        col_input, col_clear, col_btn, col_excel = st.columns([2.05, 0.35, 1.1, 0.9], gap="small", vertical_alignment="bottom")
+    else:
+        col_input, col_btn, col_excel = st.columns([2.4, 1.1, 0.9], gap="small", vertical_alignment="bottom")
+        col_clear = None
 
     with col_input:
         filter_term = st.text_input(
             "Buscar por Artículo o Descripción",
-            key="filter_term",
+            key=f"filter_term_articulos_{search_ver}",
             placeholder="Ingrese un código, una descripción o parte de ellas...",
             label_visibility="collapsed",
-            value=st.session_state.frase_filtrada,
+            value=current_filter,
             disabled=not st.session_state.view_grilla
         )
+
+    if col_clear:
+        with col_clear:
+            if st.button("↩️", key="btn_clear_search_articulos", help="Limpiar búsqueda", width="stretch", disabled=not st.session_state.view_grilla):
+                st.session_state.frase_filtrada = ""
+                st.session_state.articulos_search_version = search_ver + 1
+                st.session_state.articulos_loading_filter = True
+                st.rerun()
 
     with col_btn:
         if st.button("Filtrar", 
@@ -441,6 +457,7 @@ def articulos_crud():
                      width="stretch",
                      disabled=not st.session_state.view_grilla):
             st.session_state.frase_filtrada = filter_term.strip()
+            st.session_state.articulos_loading_filter = True
             st.session_state.do_filter = True
             st.rerun()
     
@@ -448,6 +465,17 @@ def articulos_crud():
         if st.session_state.view_grilla and not st.session_state.articulos_df.empty:
             if st.button("📊 Enviar a Excel", key="btn_excel_articulos", width="stretch", help="Seleccionar carpeta y guardar datos de la grilla en Excel (.xlsx)"):
                 config.save_excel_with_folder_dialog(st.session_state.filtered_df, "Articulos", drop_cols=['Seleccionado'])
+
+    filter_loading_placeholder = st.empty()
+    if st.session_state.get("articulos_loading_filter", False):
+        filter_loading_placeholder.markdown(
+            """
+            <div style='background-color: #052c16; border: 1px solid #065f46; border-radius: 6px; padding: 10px 14px; color: #34d399; font-weight: 500; font-family: "Source Code Pro", Consolas, monospace; font-size: 0.95rem; margin-top: 10px; margin-bottom: 10px; width: 100%;'>
+                Un momento por favor...
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     # Lógica de filtrado
     estado_grilla = "totales"
@@ -461,6 +489,9 @@ def articulos_crud():
         estado_grilla = "filtrados"
     else:
         st.session_state.filtered_df = st.session_state.articulos_df.copy()
+
+    filter_loading_placeholder.empty()
+    st.session_state["articulos_loading_filter"] = False
 
     if "filtered_df" not in st.session_state:
         st.session_state.filtered_df = st.session_state.articulos_df.copy()

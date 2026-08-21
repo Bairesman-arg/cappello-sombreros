@@ -507,13 +507,12 @@ def info_empresas_ranking():
         )
 
         # Línea horizontal de referencia en Y = 80% (roja punteada)
-        rule_80_y = alt.Chart(pd.DataFrame({'y': [80.0]})).mark_rule(
+        rule_80_y = alt.Chart(df_pareto).mark_rule(
             color='#ff4b4b',
             strokeDash=[4, 4],
             strokeWidth=2
-        ).encode(y='y:Q')
+        ).encode(y=alt.datum(80.0))
 
-        # Línea vertical de referencia en el cliente que alcanza el 80% (verde punteada)
         tot_clientes = len(df_pareto)
         df_cutoff = df_pareto[df_pareto["pareto_pct"] >= 80.0]
 
@@ -523,33 +522,48 @@ def info_empresas_ranking():
             pct_clientes_corte = round((pos_corte / tot_clientes) * 100, 1) if tot_clientes > 0 else 0
             pct_util_corte = df_cutoff.iloc[0]["pareto_pct"]
 
-            rule_80_x = alt.Chart(pd.DataFrame({'Nombre del Cliente': [cliente_corte_80]})).mark_rule(
+            df_single_corte = df_pareto[df_pareto["Nombre del Cliente"] == cliente_corte_80]
+
+            rule_80_y = alt.Chart(df_single_corte).mark_rule(
+                color='#ff4b4b',
+                strokeDash=[4, 4],
+                strokeWidth=2
+            ).encode(
+                y=alt.datum(80.0)
+            )
+
+            rule_80_x = alt.Chart(df_single_corte).mark_rule(
                 color='#00e676',
                 strokeDash=[4, 4],
                 strokeWidth=2
-            ).encode(x=alt.X('Nombre del Cliente:N', sort=None))
+            ).encode(
+                x=alt.X("Nombre del Cliente:N", sort=None)
+            )
 
-            text_annotation = alt.Chart(pd.DataFrame([{
-                'Nombre del Cliente': cliente_corte_80,
-                'y': 20.0,
-                'texto': f"Corte 80% ({pct_clientes_corte}% empresas)"
-            }])).mark_text(
+            text_annotation = alt.Chart(df_single_corte).mark_text(
                 align='left',
-                dx=6,
-                dy=0,
+                dx=8,
+                dy=18,
                 color='#00e676',
                 fontSize=12,
                 fontWeight='bold'
             ).encode(
-                x=alt.X('Nombre del Cliente:N', sort=None),
-                y='y:Q',
-                text='texto:N'
+                x=alt.X("Nombre del Cliente:N", sort=None),
+                y=alt.Y("pareto_pct:Q"),
+                text=alt.value(f"Corte 80% ({pct_clientes_corte}% empresas)")
             )
 
-            chart_pareto_final = chart_pareto + rule_80_y + rule_80_x + text_annotation
+            chart_pareto_final = (chart_pareto + rule_80_y + rule_80_x + text_annotation).resolve_scale(x='shared', y='shared')
             explicacion_pareto = f"Muestra la curva acumulada de participación comercial: El <b>{pct_clientes_corte}%</b> de tus clientes ({pos_corte} de {tot_clientes} empresas) genera el <b>{pct_util_corte}%</b> de las ganancias del mes."
         else:
-            chart_pareto_final = chart_pareto + rule_80_y
+            rule_80_y = alt.Chart(df_pareto).mark_rule(
+                color='#ff4b4b',
+                strokeDash=[4, 4],
+                strokeWidth=2
+            ).encode(
+                y=alt.datum(80.0)
+            )
+            chart_pareto_final = (chart_pareto + rule_80_y).resolve_scale(x='shared', y='shared')
             explicacion_pareto = "Muestra la curva acumulada de participación comercial (de 0% a 100%). Permite verificar si se cumple la Regla 80/20 (el 20% de las empresas genera el 80% de tus ingresos)."
 
         st.altair_chart(chart_pareto_final, use_container_width=True)
