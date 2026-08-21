@@ -181,8 +181,8 @@ def articulos_crud():
         st.session_state.was_aggregated = False
     if not "was_eliminated" in st.session_state:
         st.session_state.was_eliminated = False
-    if not "frase_filtrada" in st.session_state:    
-        st.session_state.frase_filtrada =""
+    if not "frase_filtrada_articulos" in st.session_state:    
+        st.session_state.frase_filtrada_articulos = ""
 
     if st.session_state.was_modificated or \
         st.session_state.was_aggregated or \
@@ -425,13 +425,9 @@ def articulos_crud():
     st.subheader("Filtrar Artículos")
 
     search_ver = st.session_state.get("articulos_search_version", 0)
-    current_filter = st.session_state.get("frase_filtrada", "")
+    current_filter = st.session_state.get("frase_filtrada_articulos", "")
 
-    if str(current_filter).strip():
-        col_input, col_clear, col_btn, col_excel = st.columns([2.05, 0.35, 1.1, 0.9], gap="small", vertical_alignment="bottom")
-    else:
-        col_input, col_btn, col_excel = st.columns([2.4, 1.1, 0.9], gap="small", vertical_alignment="bottom")
-        col_clear = None
+    col_input, col_clear, col_btn, col_excel = st.columns([2.05, 0.35, 1.1, 0.9], gap="small", vertical_alignment="bottom")
 
     with col_input:
         filter_term = st.text_input(
@@ -443,20 +439,20 @@ def articulos_crud():
             disabled=not st.session_state.view_grilla
         )
 
-    if col_clear:
-        with col_clear:
-            if st.button("↩️", key="btn_clear_search_articulos", help="Limpiar búsqueda", width="stretch", disabled=not st.session_state.view_grilla):
-                st.session_state.frase_filtrada = ""
-                st.session_state.articulos_search_version = search_ver + 1
-                st.session_state.articulos_loading_filter = True
-                st.rerun()
+    with col_clear:
+        is_clear_disabled = not (str(current_filter).strip() or str(filter_term).strip()) or (not st.session_state.view_grilla)
+        if st.button("↩️", key="btn_clear_search_articulos", help="Limpiar búsqueda", width="stretch", disabled=is_clear_disabled):
+            st.session_state.frase_filtrada_articulos = ""
+            st.session_state.articulos_search_version = search_ver + 1
+            st.session_state.articulos_loading_filter = True
+            st.rerun()
 
     with col_btn:
         if st.button("Filtrar", 
                      type="primary", 
                      width="stretch",
                      disabled=not st.session_state.view_grilla):
-            st.session_state.frase_filtrada = filter_term.strip()
+            st.session_state.frase_filtrada_articulos = filter_term.strip()
             st.session_state.articulos_loading_filter = True
             st.session_state.do_filter = True
             st.rerun()
@@ -480,8 +476,8 @@ def articulos_crud():
     # Lógica de filtrado
     estado_grilla = "totales"
     # Si hay una frase filtrada previa, usarla aunque no se haya presionado el botón
-    if st.session_state.frase_filtrada.strip():
-        active_filter = st.session_state.frase_filtrada.lower()
+    if st.session_state.frase_filtrada_articulos.strip():
+        active_filter = st.session_state.frase_filtrada_articulos.lower()
         st.session_state.filtered_df = st.session_state.articulos_df[
             st.session_state.articulos_df['nro_articulo'].str.lower().str.contains(active_filter, na=False) |
             st.session_state.articulos_df['descripcion'].str.lower().str.contains(active_filter, na=False)

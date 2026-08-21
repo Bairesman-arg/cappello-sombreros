@@ -235,11 +235,7 @@ def remitos_consultas():
         search_ver = st.session_state.get("consultas_search_version", 0)
         current_query = st.session_state.get("consultas_search_query", "")
 
-        if str(current_query).strip():
-            col_search, col_clear, col_filtrar, col_excel = st.columns([2.85, 0.35, 1, 1.1], gap="small")
-        else:
-            col_search, col_filtrar, col_excel = st.columns([3.2, 1, 1.1], gap="small")
-            col_clear = None
+        col_search, col_clear, col_filtrar, col_excel = st.columns([2.85, 0.35, 1, 1.1], gap="small")
 
         with col_search:
             search_input = st.text_input(
@@ -250,14 +246,14 @@ def remitos_consultas():
                 key=f"input_search_remitos_{search_ver}"
             )
 
-        if col_clear:
-            with col_clear:
-                if st.button("↩️", key="btn_clear_search_remitos", help="Limpiar búsqueda", width="stretch"):
-                    st.session_state["consultas_search_query"] = ""
-                    st.session_state["consultas_search_version"] = search_ver + 1
-                    st.session_state["consultas_selected_idx"] = 0
-                    st.session_state["consultas_loading_filter"] = True
-                    st.rerun()
+        with col_clear:
+            is_clear_disabled = not (str(current_query).strip() or str(search_input).strip())
+            if st.button("↩️", key="btn_clear_search_remitos", help="Limpiar búsqueda", width="stretch", disabled=is_clear_disabled):
+                st.session_state["consultas_search_query"] = ""
+                st.session_state["consultas_search_version"] = search_ver + 1
+                st.session_state["consultas_selected_idx"] = 0
+                st.session_state["consultas_loading_filter"] = True
+                st.rerun()
 
         with col_filtrar:
             if st.button("Filtrar", width="stretch", type="primary", key="btn_filtrar_remitos"):
