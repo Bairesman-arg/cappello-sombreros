@@ -147,16 +147,18 @@ def app():
 
         # Botón arriba de todo para reiniciar el sistema (Ctrl+F5)
         if st.button("🔄 Reiniciar Sistema Capello", width="stretch", help="Recargar la aplicación desde el Servidor (Ctrl+F5)"):
-            st.session_state.menu_version = st.session_state.get("menu_version", 0) + 1
             st.components.v1.html(
                 """
                 <script>
-                    window.parent.location.reload(true);
+                    try {
+                        window.top.location.reload(true);
+                    } catch(e) {
+                        window.parent.location.reload(true);
+                    }
                 </script>
                 """,
                 height=0,
             )
-            st.rerun()
 
         st.markdown("<div style='margin-bottom: 0.4rem;'></div>", unsafe_allow_html=True)
 
