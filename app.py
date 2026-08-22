@@ -220,13 +220,13 @@ def app():
         mainmenu = st.session_state.get("currentpage", "Codigos de Barra")
 
         if mainmenu == "Remitos":
-            rem_options = ["Entregas", "Recepciones", "Consultas", "Carga Móvil", "Anulaciones"]
+            rem_options = ["Entregas", "Recepciones", "Consultas", "Anulaciones"]
             cur_rem_sub = st.session_state.get("remitos_sub_nav", "Entregas")
             def_rem_idx = rem_options.index(cur_rem_sub) if cur_rem_sub in rem_options else 0
 
             sub_selected = option_menu(menu_title="Remitos",
                                   options=rem_options,
-                                  icons=["file-earmark-plus", "file-earmark-plus", "search", "phone", "file-earmark-plus"],
+                                  icons=["file-earmark-plus", "pencil", "search", "file-earmark-minus"],
                                   menu_icon="folder", default_index=def_rem_idx, orientation="vertical",
                                   styles=submenu_styles,
                                   key=f"remitos_sub_nav_{menu_v}")
@@ -316,9 +316,6 @@ def app():
         elif submenu == "Consultas":
             from remitos_consultas import remitos_consultas
             remitos_consultas()
-        elif submenu == "Carga Móvil":
-            from remitos_ventas_movil import remitos_ventas_movil
-            remitos_ventas_movil()
         elif submenu == "Anulaciones":
             remitos_anulaciones()
 

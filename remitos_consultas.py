@@ -281,8 +281,10 @@ def remitos_consultas():
                 df["Fecha Entrega"].astype(str).str.lower().str.contains(query_text, na=False) |
                 df["Fecha Retiro"].astype(str).str.lower().str.contains(query_text, na=False)
             ].reset_index(drop=True)
+            estado_grilla = "filtrados"
         else:
             df_filtered = df
+            estado_grilla = "totales"
 
         # Generar Excel optimizado para el listado actual con nombre #TodosLosRemitos_aaaammdd.xlsx
         excel_filename = f"#TodosLosRemitos_{dt_class.now().strftime('%Y%m%d')}.xlsx"
@@ -301,7 +303,7 @@ def remitos_consultas():
         filter_loading_placeholder.empty()
         st.session_state["consultas_loading_filter"] = False
 
-        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        st.subheader(f"Remitos ({len(df_filtered)} {estado_grilla})")
 
         if df_filtered.empty:
             st.warning("No se encontraron remitos que coincidan con la búsqueda.")

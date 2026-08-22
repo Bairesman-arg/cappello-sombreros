@@ -285,7 +285,14 @@ def remitos_ventas():
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
 
-            is_item_input_disabled = st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items
+            curr_sel = st.session_state.get("articulo_selectbox_rec")
+            articulo_sel_pre = curr_sel.split(" - ")[0] if curr_sel else None
+            is_existing_item = False
+            if articulo_sel_pre and items_key in st.session_state and not st.session_state[items_key].empty:
+                is_existing_item = articulo_sel_pre in st.session_state[items_key]['nro_articulo'].values
+
+            show_grid = view_grilla_items and not is_existing_item
+            is_item_input_disabled = st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items or is_existing_item
 
             articulo_sel_full = st.selectbox(
                 f"Artículos para {cab['razon_social']}:",
@@ -298,9 +305,10 @@ def remitos_ventas():
             )
 
             articulo_sel = None
-            if articulo_sel_full and not is_item_input_disabled:
+            if articulo_sel_full:
                 articulo_sel = articulo_sel_full.split(" - ")[0]
 
+            if articulo_sel_full and not (st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items):
                 should_preload = (
                     'articulo_precargado_rec' not in st.session_state or
                     st.session_state.articulo_precargado_rec != articulo_sel or
@@ -311,7 +319,7 @@ def remitos_ventas():
                     st.session_state.articulo_precargado_rec = articulo_sel
 
                     # Pre-cargar datos si el artículo existe en los items actuales
-                    if items_key in st.session_state and not st.session_state[items_key].empty and articulo_sel in st.session_state[items_key]['nro_articulo'].values:
+                    if is_existing_item:
                         row = st.session_state[items_key].loc[st.session_state[items_key]['nro_articulo'] == articulo_sel].iloc[0]
                         st.session_state.entregados_input_rec = int(row['entregados'])
                         st.session_state.observaciones_item_input_rec = str(row['observaciones']) if pd.notna(row['observaciones']) else ""
@@ -327,8 +335,6 @@ def remitos_ventas():
                             st.session_state.precio_real_input_rec = 0.0
                     st.session_state.focus_target = "entregados"
                     st.rerun()
-            elif articulo_sel_full:
-                articulo_sel = articulo_sel_full.split(" - ")[0]
 
             col_entregados, col_precio, col_observ = st.columns([1, 1, 3], gap="small")
             with col_entregados:
@@ -357,25 +363,42 @@ def remitos_ventas():
             # Botones de acción ("Agregar Item ➕", "Eliminar Item 🗑️" y "Limpiar Formulario 🔄")
             c_btn1, c_btn2, c_btn3 = st.columns(3, gap="small")
 
+            disabled_add = (
+                articulo_sel is None or 
+                st.session_state.is_form_disabled or 
+                item_selected_from_grid or 
+                not view_grilla_items or 
+                is_existing_item
+            )
+            disabled_del = (
+                articulo_sel is None or 
+                st.session_state.is_form_disabled or 
+                not is_existing_item
+            )
+            disabled_clear = (
+                st.session_state.is_form_disabled or 
+                (view_grilla_items and articulo_sel is None and not item_selected_from_grid)
+            )
+
             with c_btn1:
                 add_clicked = st.button(
                     "Agregar Item ➕",
                     width="stretch",
-                    disabled=(articulo_sel is None or st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items)
+                    disabled=disabled_add
                 )
 
             with c_btn2:
                 del_clicked = st.button(
                     "Eliminar Item 🗑️",
                     width="stretch",
-                    disabled=(articulo_sel is None or st.session_state.is_form_disabled)
+                    disabled=disabled_del
                 )
 
             with c_btn3:
                 clear_form_clicked = st.button(
                     "Limpiar Formulario 🔄",
                     width="stretch",
-                    disabled=(view_grilla_items or st.session_state.is_form_disabled)
+                    disabled=disabled_clear
                 )
 
             if clear_form_clicked:
@@ -447,14 +470,16 @@ def remitos_ventas():
                 elif msg_type == "success":
                     st.success(msg_text)
                 del st.session_state.item_rec_message
+            elif is_existing_item:
+                st.success("Artículo existente en el Remito. Solo puede ser Eliminado o cancele la operación Limpiando el Formulario.")
 
             grid_ver_key = f"rec_grid_version_{remito_id}"
             grid_ver = st.session_state.get(grid_ver_key, 0)
             editor_key = f"editor_{remito_id}_{grid_ver}"
 
-            if view_grilla_items:
+            if show_grid:
                 st.subheader(f"Items del Remito #{remito_id}")
-                st.markdown("`Seleccione la primera columna de la grilla inferior para modificar o eliminar`")
+                st.markdown("`Seleccione la primera columna de la grilla inferior para eliminar`")
 
                 col_edit, col_calc = st.columns([4, 1], gap="small")
                 
@@ -482,7 +507,7 @@ def remitos_ventas():
                         column_config={
                             "Seleccionado": st.column_config.CheckboxColumn(
                                 "✔",
-                                help="Marque la casilla de verificación para editar o eliminar este artículo.",
+                                help="Marque la casilla de verificación para eliminar este artículo.",
                                 width=40
                             ),
                             "nro_articulo": st.column_config.TextColumn("Artículo", disabled=True, width="small"),
@@ -617,7 +642,7 @@ def remitos_ventas():
                 else:
                     fecha_retiro_error = False
 
-            if view_grilla_items:
+            if show_grid:
                 with col_calc:
                     st.markdown("#### Vendidos")
                     
