@@ -272,6 +272,18 @@ def remitos_ventas():
             # === SECCIÓN CARGA Y ELIMINACIÓN DE ITEMS ===
             st.header("Carga y Eliminación de Items")
 
+            st.markdown(
+                """
+                <style>
+                    /* Ocultar el botón 'x' (limpiar selección) en los controles selectbox */
+                    div[data-baseweb="select"] button {
+                        display: none !important;
+                    }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+
             if "pending_selected_item_rec" in st.session_state:
                 pending = st.session_state.pop("pending_selected_item_rec")
                 if pending:
@@ -284,6 +296,11 @@ def remitos_ventas():
             articulo_options_full = st.session_state.articulos_df.apply(
                 lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
             ).tolist()
+
+            if "pending_articulo_selectbox_rec_val" in st.session_state:
+                pending_val_rec = st.session_state.pop("pending_articulo_selectbox_rec_val")
+                if pending_val_rec:
+                    st.session_state["articulo_selectbox_rec"] = pending_val_rec
 
             curr_sel = st.session_state.get("articulo_selectbox_rec")
             articulo_sel_pre = curr_sel.split(" - ")[0] if curr_sel else None
@@ -331,6 +348,7 @@ def remitos_ventas():
                             st.session_state.precio_real_input_rec = float(articulo_data['precio_real'])
                             st.session_state.entregados_input_rec = 1
                             st.session_state.observaciones_item_input_rec = ""
+                            st.session_state["pending_articulo_selectbox_rec_val"] = f"{articulo_data['nro_articulo']} - {articulo_data['descripcion']}"
                         else:
                             st.session_state.precio_real_input_rec = 0.0
                     st.session_state.focus_target = "entregados"
@@ -983,23 +1001,54 @@ def remitos_ventas():
             if (!doc._enterAsTabAttachedRec) {{
                 doc._enterAsTabAttachedRec = true;
                 doc.addEventListener('keydown', function(e) {{
-                    if (e.key === 'Enter' || e.keyCode === 13) {{
+                    if (e.key === 'Enter' || e.keyCode === 13 || e.key === 'Tab' || e.keyCode === 9) {{
                         const activeEl = doc.activeElement;
                         if (!activeEl) return;
                         if (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'TEXTAREA') {{
                             return;
                         }}
                         if (activeEl.closest && activeEl.closest('div[data-testid="stSelectbox"]')) {{
-                            return;
+                            const menu = doc.querySelector('[role="listbox"]') || doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('ul[role="listbox"]');
+                            if (menu) {{
+                                const firstOpt = menu.querySelector('[aria-selected="true"]') || 
+                                                 menu.querySelector('li[role="option"]') || 
+                                                 menu.querySelector('[role="option"]') || 
+                                                 menu.querySelector('li');
+                                if (firstOpt) {{
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const opts = {{ bubbles: true, cancelable: true, view: window.parent }};
+                                    try {{ firstOpt.dispatchEvent(new MouseEvent('pointerdown', opts)); }} catch(err1){{}}
+                                    try {{ firstOpt.dispatchEvent(new MouseEvent('mousedown', opts)); }} catch(err2){{}}
+                                    try {{ firstOpt.dispatchEvent(new MouseEvent('mouseup', opts)); }} catch(err3){{}}
+                                    try {{ firstOpt.click(); }} catch(err4){{}}
+                                    return;
+                                }}
+                            }} else {{
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                                const entregadosWidget = numInputs.find(w => (w.innerText || '').includes('Entregados')) || numInputs[0];
+                                if (entregadosWidget) {{
+                                    const input = entregadosWidget.querySelector('input');
+                                    if (input) {{
+                                        input.focus();
+                                        if (input.select) input.select();
+                                    }}
+                                }}
+                                return;
+                            }}
                         }}
-                        const sequence = getFormSequence();
-                        const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
-                        if (currIdx > -1 && currIdx < sequence.length - 1) {{
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const nextItem = sequence[currIdx + 1];
-                            nextItem.input.focus();
-                            if (nextItem.input.select) nextItem.input.select();
+                        if (e.key === 'Enter' || e.keyCode === 13) {{
+                            const sequence = getFormSequence();
+                            const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
+                            if (currIdx > -1 && currIdx < sequence.length - 1) {{
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const nextItem = sequence[currIdx + 1];
+                                nextItem.input.focus();
+                                if (nextItem.input.select) nextItem.input.select();
+                            }}
                         }}
                     }}
                 }}, true);

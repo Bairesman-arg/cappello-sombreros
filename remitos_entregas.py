@@ -216,6 +216,18 @@ def remitos_entregas():
     # === SECCIÓN ITEMS ===
     st.header("Carga de Items")
 
+    st.markdown(
+        """
+        <style>
+            /* Ocultar el botón 'x' (limpiar selección) en los controles selectbox */
+            div[data-baseweb="select"] button {
+                display: none !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # Preparar opciones de artículos
     articulo_options_full = st.session_state.articulos_df.apply(
         lambda row: f"{row['nro_articulo']} - {row['descripcion']}", axis=1
@@ -226,6 +238,11 @@ def remitos_entregas():
     if st.session_state.cabecera_data.get('cliente_id') and st.session_state.cliente_selected_display:
         razon_social = st.session_state.cliente_selected_display.split("  |  Boca:")[0].strip()
         articulo_label = f"Artículos para {razon_social}:"
+
+    if "pending_articulo_selectbox_fixed" in st.session_state:
+        pending_val = st.session_state.pop("pending_articulo_selectbox_fixed")
+        if pending_val:
+            st.session_state["articulo_selectbox_fixed"] = pending_val
 
     # Selectbox de artículo
     articulo_sel_full = st.selectbox(
@@ -274,6 +291,7 @@ def remitos_entregas():
                     st.session_state.precio_original_articulo = precio_maestro
                     st.session_state.entregados_input = 1
                     st.session_state.observaciones_item_input = ""
+                    st.session_state["pending_articulo_selectbox_fixed"] = f"{articulo_data['nro_articulo']} - {articulo_data['descripcion']}"
                 else:
                     st.error(f"Error: No se encontró el artículo {articulo_sel}")
                     st.session_state.precio_real_input = 0.0
@@ -713,23 +731,42 @@ def remitos_entregas():
                 if (!doc._enterAsTabAttached) {{
                     doc._enterAsTabAttached = true;
                     doc.addEventListener('keydown', function(e) {{
-                        if (e.key === 'Enter' || e.keyCode === 13) {{
+                        if (e.key === 'Enter' || e.keyCode === 13 || e.key === 'Tab' || e.keyCode === 9) {{
                             const activeEl = doc.activeElement;
                             if (!activeEl) return;
                             if (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'TEXTAREA') {{
                                 return;
                             }}
                             if (activeEl.closest && activeEl.closest('div[data-testid="stSelectbox"]')) {{
+                                const menu = doc.querySelector('[role="listbox"]') || doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('ul[role="listbox"]');
+                                if (menu) {{
+                                    const firstOpt = menu.querySelector('[aria-selected="true"]') || 
+                                                     menu.querySelector('li[role="option"]') || 
+                                                     menu.querySelector('[role="option"]') || 
+                                                     menu.querySelector('li');
+                                    if (firstOpt) {{
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        const opts = {{ bubbles: true, cancelable: true, view: window.parent }};
+                                        try {{ firstOpt.dispatchEvent(new MouseEvent('pointerdown', opts)); }} catch(err1){{}}
+                                        try {{ firstOpt.dispatchEvent(new MouseEvent('mousedown', opts)); }} catch(err2){{}}
+                                        try {{ firstOpt.dispatchEvent(new MouseEvent('mouseup', opts)); }} catch(err3){{}}
+                                        try {{ firstOpt.click(); }} catch(err4){{}}
+                                        return;
+                                    }}
+                                }}
                                 return;
                             }}
-                            const sequence = getFormSequence();
-                            const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
-                            if (currIdx > -1 && currIdx < sequence.length - 1) {{
-                                e.preventDefault();
-                                e.stopPropagation();
-                                const nextItem = sequence[currIdx + 1];
-                                nextItem.input.focus();
-                                if (nextItem.input.select) nextItem.input.select();
+                            if (e.key === 'Enter' || e.keyCode === 13) {{
+                                const sequence = getFormSequence();
+                                const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
+                                if (currIdx > -1 && currIdx < sequence.length - 1) {{
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const nextItem = sequence[currIdx + 1];
+                                    nextItem.input.focus();
+                                    if (nextItem.input.select) nextItem.input.select();
+                                }}
                             }}
                         }}
                     }}, true);
@@ -739,15 +776,24 @@ def remitos_entregas():
 
         const targetType = '{target_to_focus}';
         if (targetType) {{
-            setTimeout(function() {{
+            let attempts = 0;
+            const maxAttempts = 25;
+            const interval = setInterval(function() {{
+                attempts++;
                 try {{
                     const doc = window.parent.document;
                     if (targetType === 'entregados') {{
-                        const numInputs = doc.querySelectorAll('div[data-testid="stNumberInput"] input');
-                        if (numInputs.length > 0) {{
-                            const target = numInputs[0];
-                            target.focus();
-                            if (target.select) target.select();
+                        const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                        const entregadosWidget = numInputs.find(w => (w.innerText || '').includes('Entregados')) || numInputs[0];
+                        if (entregadosWidget) {{
+                            const input = entregadosWidget.querySelector('input');
+                            if (input) {{
+                                input.focus();
+                                if (input.select) input.select();
+                                if (doc.activeElement === input || attempts >= maxAttempts) {{
+                                    clearInterval(interval);
+                                }}
+                            }}
                         }}
                     }} else if (targetType === 'articulo') {{
                         const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
@@ -756,12 +802,17 @@ def remitos_entregas():
                             const input = targetBox.querySelector('input') || targetBox.querySelector('div[role="combobox"]');
                             if (input) {{
                                 input.focus();
-                                input.click();
+                                if (input.select) input.select();
+                                if (doc.activeElement === input || attempts >= maxAttempts) {{
+                                    clearInterval(interval);
+                                }}
                             }}
                         }}
                     }}
-                }} catch(e) {{}}
-            }}, 300);
+                }} catch(e) {{
+                    if (attempts >= maxAttempts) clearInterval(interval);
+                }}
+            }}, 40);
         }}
     </script>
     """, height=0, width=0)
