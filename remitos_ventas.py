@@ -309,15 +309,20 @@ def remitos_ventas():
                 is_existing_item = articulo_sel_pre in st.session_state[items_key]['nro_articulo'].values
 
             show_grid = view_grilla_items and not is_existing_item
-            is_item_input_disabled = st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items or is_existing_item
+            is_selectbox_disabled = st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items
+            is_item_input_disabled = is_selectbox_disabled or is_existing_item
+
+            default_art_index = None
+            if st.session_state.get("articulo_selectbox_rec") in articulo_options_full:
+                default_art_index = articulo_options_full.index(st.session_state["articulo_selectbox_rec"])
 
             articulo_sel_full = st.selectbox(
                 f"Artículos para {cab['razon_social']}:",
                 options=articulo_options_full,
-                index=None,
+                index=default_art_index,
                 placeholder="Seleccione un artículo...",
                 key="articulo_selectbox_rec",
-                disabled=is_item_input_disabled,
+                disabled=is_selectbox_disabled,
                 help="Seleccione un nuevo artículo o uno existente para agregar o eliminar."
             )
 
