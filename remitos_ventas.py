@@ -895,217 +895,322 @@ def remitos_ventas():
     components.html(f"""
     <script>
         (function() {{
-            const doc = window.parent.document;
-            if (doc && doc.documentElement) {{
-                doc.documentElement.lang = 'es';
-            }}
+            try {{
+                const doc = window.parent.document;
+                const pWin = window.parent;
 
-            if (window.parent._selectHandler) {{
-                doc.removeEventListener('focusin', window.parent._selectHandler, true);
-                doc.removeEventListener('click', window.parent._selectHandler, true);
-            }}
-            if (window.parent._selectionChangeHandler) {{
-                doc.removeEventListener('selectionchange', window.parent._selectionChangeHandler, true);
-            }}
-
-            function doSelect(el) {{
-                if (!el || doc.activeElement !== el) return;
-                if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'button' || el.type === 'submit') return;
-                try {{
-                    if (typeof el.select === 'function') {{
-                        el.select();
-                    }}
-                }} catch(e1) {{}}
-                try {{
-                    if (typeof el.setSelectionRange === 'function' && el.value !== undefined) {{
-                        el.setSelectionRange(0, el.value.length);
-                    }}
-                }} catch(e2) {{}}
-            }}
-
-            window.parent._selectHandler = function(e) {{
-                const target = e.target;
-                if (!target) return;
-                const tag = (target.tagName || '').toUpperCase();
-                if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
-                if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'button' || target.type === 'submit') return;
-
-                if (target.dataset.autoSelecting === 'true') return;
-                target.dataset.autoSelecting = 'true';
-
-                function runPasses() {{
-                    doSelect(target);
-                    setTimeout(function() {{ doSelect(target); }}, 10);
-                    setTimeout(function() {{ doSelect(target); }}, 40);
-                    setTimeout(function() {{ doSelect(target); }}, 120);
-                    setTimeout(function() {{ doSelect(target); }}, 250);
-                    setTimeout(function() {{ doSelect(target); }}, 450);
-                    requestAnimationFrame(function() {{ doSelect(target); }});
+                if (doc && doc.documentElement) {{
+                    doc.documentElement.lang = 'es';
                 }}
 
-                runPasses();
-            }};
+                // Función auxiliar para seleccionar todo el texto de un input
+                function doSelect(el) {{
+                    if (!el || doc.activeElement !== el) return;
+                    if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'button' || el.type === 'submit') return;
+                    try {{ if (typeof el.select === 'function') el.select(); }} catch(e) {{}}
+                    try {{ if (typeof el.setSelectionRange === 'function' && el.value !== undefined) el.setSelectionRange(0, el.value.length); }} catch(e) {{}}
+                }}
 
-            window.parent._selectionChangeHandler = function() {{
-                const active = doc.activeElement;
-                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {{
-                    if (active.dataset.autoSelecting === 'true') {{
-                        if (active.selectionStart !== 0 || active.selectionEnd !== active.value.length) {{
-                            doSelect(active);
+                // Limpieza de escuchadores previos
+                if (pWin._selectHandlerRec) {{
+                    doc.removeEventListener('focusin', pWin._selectHandlerRec, true);
+                    doc.removeEventListener('click', pWin._selectHandlerRec, true);
+                }}
+                if (pWin._selectionChangeHandlerRec) {{
+                    doc.removeEventListener('selectionchange', pWin._selectionChangeHandlerRec, true);
+                }}
+                if (pWin._keyHandlerRec) {{
+                    doc.removeEventListener('keydown', pWin._keyHandlerRec, true);
+                }}
+
+                // Autoselección de texto al enfocar
+                pWin._selectHandlerRec = function(e) {{
+                    const target = e.target;
+                    if (!target) return;
+                    const tag = (target.tagName || '').toUpperCase();
+                    if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
+                    if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'button' || target.type === 'submit') return;
+
+                    if (target.dataset.autoSelecting === 'true') return;
+                    target.dataset.autoSelecting = 'true';
+
+                    function runPasses() {{
+                        doSelect(target);
+                        setTimeout(function() {{ doSelect(target); }}, 10);
+                        setTimeout(function() {{ doSelect(target); }}, 50);
+                        setTimeout(function() {{ doSelect(target); }}, 150);
+                        setTimeout(function() {{ doSelect(target); }}, 300);
+                        requestAnimationFrame(function() {{ doSelect(target); }});
+                    }}
+                    runPasses();
+                }};
+
+                pWin._selectionChangeHandlerRec = function() {{
+                    const active = doc.activeElement;
+                    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {{
+                        if (active.dataset.autoSelecting === 'true') {{
+                            if (active.selectionStart !== 0 || active.selectionEnd !== active.value.length) {{
+                                doSelect(active);
+                            }}
                         }}
                     }}
-                }}
-            }};
+                }};
 
-            doc.addEventListener('focusin', window.parent._selectHandler, true);
-            doc.addEventListener('click', window.parent._selectHandler, true);
-            doc.addEventListener('selectionchange', window.parent._selectionChangeHandler, true);
+                doc.addEventListener('focusin', pWin._selectHandlerRec, true);
+                doc.addEventListener('click', pWin._selectHandlerRec, true);
+                doc.addEventListener('selectionchange', pWin._selectionChangeHandlerRec, true);
 
-            doc.addEventListener('keydown', function(e) {{
-                if (e.target && e.target.dataset) {{
-                    delete e.target.dataset.autoSelecting;
-                }}
-            }}, true);
-
-            doc.addEventListener('focusout', function(e) {{
-                if (e.target && e.target.dataset) {{
-                    delete e.target.dataset.autoSelecting;
-                }}
-            }}, true);
-
-            function getFormSequence() {{
-                const sequence = [];
-                const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
-                if (selectboxes.length > 0) {{
-                    const artBox = selectboxes[selectboxes.length - 1];
-                    const input = artBox.querySelector('input');
-                    if (input) sequence.push({{ container: artBox, input: input }});
-                }}
-                const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
-                numInputs.forEach(w => {{
-                    const input = w.querySelector('input');
-                    if (input) sequence.push({{ container: w, input: input }});
-                }});
-                const textInputs = Array.from(doc.querySelectorAll('div[data-testid="stTextInput"]'));
-                textInputs.forEach(w => {{
-                    const input = w.querySelector('input');
-                    if (input) sequence.push({{ container: w, input: input }});
-                }});
-                const buttons = Array.from(doc.querySelectorAll('button'));
-                const addBtn = buttons.find(b => (b.textContent || '').includes('Agregar Item') && !b.disabled);
-                if (addBtn) sequence.push({{ container: addBtn, input: addBtn, isButton: true }});
-                
-                return sequence;
-            }}
-
-            if (!doc._enterAsTabAttachedRec) {{
-                doc._enterAsTabAttachedRec = true;
                 doc.addEventListener('keydown', function(e) {{
+                    if (e.target && e.target.dataset) delete e.target.dataset.autoSelecting;
+                }}, true);
+
+                doc.addEventListener('focusout', function(e) {{
+                    if (e.target && e.target.dataset) delete e.target.dataset.autoSelecting;
+                }}, true);
+
+                // Función para seleccionar la primera opción o la opción activa en BaseWeb Select
+                function triggerOptionClick(targetOpt) {{
+                    if (!targetOpt) return;
+                    const rect = targetOpt.getBoundingClientRect();
+                    const clientX = rect.left + rect.width / 2;
+                    const clientY = rect.top + rect.height / 2;
+
+                    // 1. Invocar props directas de React si existen
+                    const allNodes = [targetOpt, ...Array.from(targetOpt.querySelectorAll('*')), targetOpt.parentElement];
+                    for (let i = 0; i < allNodes.length; i++) {{
+                        const node = allNodes[i];
+                        if (!node) continue;
+                        const nKeys = Object.keys(node);
+                        for (let j = 0; j < nKeys.length; j++) {{
+                            const k = nKeys[j];
+                            if (k.startsWith('__reactProps$') || k.startsWith('__reactEventHandlers$')) {{
+                                const props = node[k];
+                                if (props) {{
+                                    const mockEvt = {{
+                                        preventDefault: function() {{}},
+                                        stopPropagation: function() {{}},
+                                        bubbles: true,
+                                        cancelable: true,
+                                        target: node,
+                                        currentTarget: node,
+                                        clientX: clientX,
+                                        clientY: clientY
+                                    }};
+                                    if (typeof props.onClick === 'function') try {{ props.onClick(mockEvt); }} catch(e) {{}}
+                                    if (typeof props.onMouseDown === 'function') try {{ props.onMouseDown(mockEvt); }} catch(e) {{}}
+                                }}
+                            }}
+                        }}
+                    }}
+
+                    // 2. Disparar eventos DOM nativos de puntero y ratón con coordenadas
+                    const targetEl = targetOpt.querySelector('span, div, p') || targetOpt;
+                    ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'].forEach(function(evtName) {{
+                        try {{
+                            const evt = new pWin.MouseEvent(evtName, {{
+                                bubbles: true,
+                                cancelable: true,
+                                view: pWin,
+                                composed: true,
+                                clientX: clientX,
+                                clientY: clientY,
+                                buttons: 1
+                            }});
+                            targetEl.dispatchEvent(evt);
+                            targetOpt.dispatchEvent(evt);
+                        }} catch(e1) {{
+                            try {{
+                                const evt = new MouseEvent(evtName, {{ bubbles: true, cancelable: true, clientX: clientX, clientY: clientY, buttons: 1 }});
+                                targetEl.dispatchEvent(evt);
+                                targetOpt.dispatchEvent(evt);
+                            }} catch(e2) {{}}
+                        }}
+                    }});
+                    try {{ targetEl.click(); }} catch(e) {{}}
+                    try {{ targetOpt.click(); }} catch(e) {{}}
+                }}
+
+                // Secuencia exacta del formulario de items para Enter
+                function getFormSequence() {{
+                    const sequence = [];
+                    
+                    // 1. Selector de artículos
+                    const selectboxes = Array.from(doc.querySelectorAll('div[data-testid="stSelectbox"]'));
+                    if (selectboxes.length > 0) {{
+                        const artBox = selectboxes[selectboxes.length - 1];
+                        const input = artBox.querySelector('input');
+                        if (input && !input.disabled) sequence.push({{ container: artBox, input: input }});
+                    }}
+                    
+                    // 2. Entregados
+                    const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                    const entWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Entregados'));
+                    if (entWidget) {{
+                        const input = entWidget.querySelector('input');
+                        if (input && !input.disabled) sequence.push({{ container: entWidget, input: input }});
+                    }}
+                    
+                    // 3. Precio Real
+                    const precWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Precio Real'));
+                    if (precWidget) {{
+                        const input = precWidget.querySelector('input');
+                        if (input && !input.disabled) sequence.push({{ container: precWidget, input: input }});
+                    }}
+                    
+                    // 4. Botón Agregar Item o Modificar Item (salto directo desde Precio Real)
+                    const buttons = Array.from(doc.querySelectorAll('button'));
+                    const actionBtn = buttons.find(b => 
+                        ((b.textContent || '').includes('Agregar Item') || (b.textContent || '').includes('Modificar Item')) && !b.disabled
+                    );
+                    if (actionBtn) sequence.push({{ container: actionBtn, input: actionBtn, isButton: true }});
+                    
+                    return sequence;
+                }}
+
+                // Handler de TECLADO
+                pWin._keyHandlerRec = function(e) {{
                     if (e.key === 'Enter' || e.keyCode === 13 || e.key === 'Tab' || e.keyCode === 9) {{
                         const activeEl = doc.activeElement;
                         if (!activeEl) return;
-                        if (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'TEXTAREA') {{
-                            return;
-                        }}
+                        if (activeEl.tagName === 'TEXTAREA') return;
+
+                        // Si el foco está en el selector de artículos
                         if (activeEl.closest && activeEl.closest('div[data-testid="stSelectbox"]')) {{
-                            const menu = doc.querySelector('[role="listbox"]') || doc.querySelector('[data-baseweb="menu"]') || doc.querySelector('ul[role="listbox"]');
-                            if (menu) {{
-                                const firstOpt = menu.querySelector('[aria-selected="true"]') || 
-                                                 menu.querySelector('li[role="option"]') || 
-                                                 menu.querySelector('[role="option"]') || 
-                                                 menu.querySelector('li');
-                                if (firstOpt) {{
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const opts = {{ bubbles: true, cancelable: true, view: window.parent }};
-                                    try {{ firstOpt.dispatchEvent(new MouseEvent('pointerdown', opts)); }} catch(err1){{}}
-                                    try {{ firstOpt.dispatchEvent(new MouseEvent('mousedown', opts)); }} catch(err2){{}}
-                                    try {{ firstOpt.dispatchEvent(new MouseEvent('mouseup', opts)); }} catch(err3){{}}
-                                    try {{ firstOpt.click(); }} catch(err4){{}}
-                                    return;
-                                }}
-                            }} else {{
-                                e.preventDefault();
-                                e.stopPropagation();
+                            // Si es TAB: siempre pasar al siguiente campo (Entregados)
+                            if (e.key === 'Tab' || e.keyCode === 9) {{
                                 const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
-                                const entregadosWidget = numInputs.find(w => (w.innerText || '').includes('Entregados')) || numInputs[0];
+                                const entregadosWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Entregados')) || numInputs[0];
                                 if (entregadosWidget) {{
                                     const input = entregadosWidget.querySelector('input');
                                     if (input) {{
+                                        e.preventDefault();
+                                        e.stopPropagation();
                                         input.focus();
-                                        if (input.select) input.select();
+                                        doSelect(input);
+                                        return;
                                     }}
                                 }}
                                 return;
                             }}
+
+                            // Si es ENTER:
+                            if (e.key === 'Enter' || e.keyCode === 13) {{
+                                const allOptions = Array.from(doc.querySelectorAll('[role="option"], [data-baseweb="menu"] li, div[data-baseweb="popover"] li, ul[role="listbox"] li'))
+                                                        .filter(el => (el.textContent || '').trim().length > 0);
+                                if (allOptions.length > 0) {{
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const highlighted = allOptions.find(o => o.getAttribute('aria-selected') === 'true' || o.dataset.highlighted === 'true');
+                                    const targetOpt = highlighted || allOptions[0];
+                                    triggerOptionClick(targetOpt);
+                                    return;
+                                }} else {{
+                                    // Menú cerrado o artículo establecido: pasar a Entregados
+                                    const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                                    const entregadosWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Entregados')) || numInputs[0];
+                                    if (entregadosWidget) {{
+                                        const input = entregadosWidget.querySelector('input');
+                                        if (input) {{
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            input.focus();
+                                            doSelect(input);
+                                            return;
+                                        }}
+                                    }}
+                                    return;
+                                }}
+                            }}
                         }}
+
+                        // Para los demás campos, Enter salta al siguiente
                         if (e.key === 'Enter' || e.keyCode === 13) {{
+                            if (activeEl.tagName === 'BUTTON') return;
                             const sequence = getFormSequence();
-                            const currIdx = sequence.findIndex(item => item.container.contains(activeEl) || item.input === activeEl);
+                            const currIdx = sequence.findIndex(item => item.input === activeEl || item.container.contains(activeEl));
                             if (currIdx > -1 && currIdx < sequence.length - 1) {{
                                 e.preventDefault();
                                 e.stopPropagation();
                                 const nextItem = sequence[currIdx + 1];
                                 nextItem.input.focus();
-                                if (nextItem.input.select) nextItem.input.select();
+                                if (!nextItem.isButton) {{
+                                    doSelect(nextItem.input);
+                                }}
                             }}
                         }}
                     }}
-                }}, true);
-            }}
+                }};
+                doc.addEventListener('keydown', pWin._keyHandlerRec, true);
 
-            {focus_script}
+                {focus_script}
+            }} catch(e) {{}}
         }})();
 
+        // Control continuo de foco post-render (SOLO cuando Python valida y confirma el cambio)
         const targetType = '{target_to_focus}';
-        if (targetType) {{
+        if (targetType === 'entregados') {{
             let attempts = 0;
-            const maxAttempts = 25;
+            const maxAttempts = 40;
             const interval = setInterval(function() {{
                 attempts++;
                 try {{
                     const doc = window.parent.document;
-                    if (targetType === 'entregados') {{
-                        const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
-                        const entregadosWidget = numInputs.find(w => (w.innerText || '').includes('Entregados')) || numInputs[1] || numInputs[0];
-                        if (entregadosWidget) {{
-                            const input = entregadosWidget.querySelector('input');
-                            if (input) {{
-                                if (doc.activeElement !== input) {{
-                                    if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
-                                        try {{ doc.activeElement.blur(); }} catch(e) {{}}
-                                    }}
-                                    input.focus();
-                                    if (typeof input.select === 'function') {{ try {{ input.select(); }} catch(e) {{}} }}
-                                }} else {{
-                                    if (typeof input.select === 'function') {{ try {{ input.select(); }} catch(e) {{}} }}
-                                    if (attempts > 5) {{ clearInterval(interval); }}
+                    const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                    const entregadosWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Entregados')) || numInputs[0];
+                    if (entregadosWidget) {{
+                        const input = entregadosWidget.querySelector('input');
+                        if (input) {{
+                            if (doc.activeElement !== input) {{
+                                if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
+                                    try {{ doc.activeElement.blur(); }} catch(e) {{}}
                                 }}
-                            }}
-                        }}
-                    }} else if (targetType === 'articulo') {{
-                        const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
-                        if (selectboxes.length > 0) {{
-                            const targetBox = selectboxes[selectboxes.length - 1];
-                            const input = targetBox.querySelector('input') || targetBox.querySelector('div[role="combobox"]');
-                            if (input) {{
-                                if (doc.activeElement !== input) {{
-                                    if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
-                                        try {{ doc.activeElement.blur(); }} catch(e) {{}}
-                                    }}
-                                    input.focus();
-                                    try {{ input.click(); }} catch(e) {{}}
-                                }} else {{
-                                    if (attempts > 5) {{ clearInterval(interval); }}
-                                }}
+                                input.focus();
+                                try {{
+                                    input.select();
+                                    input.setSelectionRange(0, input.value.length);
+                                }} catch(e) {{}}
+                            }} else {{
+                                try {{
+                                    input.select();
+                                    input.setSelectionRange(0, input.value.length);
+                                }} catch(e) {{}}
+                                if (attempts > 5) clearInterval(interval);
                             }}
                         }}
                     }}
-                }} catch(e) {{}}
-                if (attempts >= maxAttempts) {{
-                    clearInterval(interval);
+                }} catch(e) {{
+                    if (attempts >= maxAttempts) clearInterval(interval);
                 }}
-            }}, 100);
+                if (attempts >= maxAttempts) clearInterval(interval);
+            }}, 25);
+        }} else if (targetType === 'articulo') {{
+            let attempts = 0;
+            const maxAttempts = 40;
+            const interval = setInterval(function() {{
+                attempts++;
+                try {{
+                    const doc = window.parent.document;
+                    const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
+                    if (selectboxes.length > 0) {{
+                        const targetBox = selectboxes[selectboxes.length - 1];
+                        const input = targetBox.querySelector('input') || targetBox.querySelector('div[role="combobox"]');
+                        if (input) {{
+                            if (doc.activeElement !== input) {{
+                                if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
+                                    try {{ doc.activeElement.blur(); }} catch(e) {{}}
+                                }}
+                                input.focus();
+                                try {{ input.select(); }} catch(e) {{}}
+                            }} else {{
+                                if (attempts > 5) clearInterval(interval);
+                            }}
+                        }}
+                    }}
+                }} catch(e) {{
+                    if (attempts >= maxAttempts) clearInterval(interval);
+                }}
+                if (attempts >= maxAttempts) clearInterval(interval);
+            }}, 25);
         }}
     </script>
     """, height=0, width=0)
