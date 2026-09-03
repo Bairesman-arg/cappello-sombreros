@@ -730,14 +730,19 @@ def remitos_ventas():
                 total_entregados = total_devueltos = total_vendidos = 0
                 total_utilidades = 0.0
 
-            col_tot_left, col_tot_right = st.columns([4, 1], gap="small")
+            col_tot_left, col_tot_right = st.columns([3, 1.4], gap="small")
             with col_tot_left:
                 c1, c2, c3 = st.columns(3, gap="small")
                 c1.metric("Total Entregados", total_entregados)
                 c2.metric("Total Devueltos", total_devueltos)
                 c3.metric("Total Vendidos", total_vendidos)
             with col_tot_right:
-                st.metric("Utilidad del Remito", f"$ {total_utilidades:,.2f}")
+                st.markdown(f"""
+                <div style="text-align: right; width: 100%;">
+                    <div style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.7); font-weight: 400; margin-bottom: 4px;">Utilidad del Remito</div>
+                    <div style="font-size: 2rem; font-weight: 600; color: var(--text-color, #ffffff); line-height: 1.2;">$ {total_utilidades:.2f}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
             # === BOTONES PRINCIPALES (siguiendo la lógica de remitos_entregas.py) ===
             st.header("Acciones del Remito")

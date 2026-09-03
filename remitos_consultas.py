@@ -411,7 +411,7 @@ def remitos_consultas():
                 t_devueltos = int(items_df["Devueltos"].sum())
                 t_vendidos = int(items_df["Vendidos"].sum())
 
-                m1, m2, m3, m4 = st.columns(4)
+                m1, m2, m3, m4 = st.columns([1, 1, 1, 1.4])
                 with m1:
                     st.metric("Total Entregados", f"{t_entregados}")
                 with m2:
@@ -419,7 +419,12 @@ def remitos_consultas():
                 with m3:
                     st.metric("Total Vendidos", f"{t_vendidos}")
                 with m4:
-                    st.metric("Utilidad del Remito", f"$ {utilidad_remito:,.2f}")
+                    st.markdown(f"""
+                    <div style="text-align: right; width: 100%;">
+                        <div style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.7); font-weight: 400; margin-bottom: 4px;">Utilidad del Remito</div>
+                        <div style="font-size: 2rem; font-weight: 600; color: var(--text-color, #ffffff); line-height: 1.2;">$ {utilidad_remito:.2f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
     # Footer
     st.markdown(f"`{config.FOOTER_APP}`")
