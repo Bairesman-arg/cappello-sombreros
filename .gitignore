@@ -21,3 +21,4 @@ remito_*
 *.sql
 *.zip
 DOCS/Working_*.txt
+BACK_DB/backup_simulaciones_pre_sept2026.xlsx

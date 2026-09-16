@@ -15,12 +15,15 @@ def clear_item_inputs_rec(set_focus=False, remito_id=None):
     if remito_id is not None:
         st.session_state[f"view_items_grid_{remito_id}"] = True
         st.session_state[f"item_selected_from_grid_{remito_id}"] = False
+        st.session_state[f"rec_grid_version_{remito_id}"] = st.session_state.get(f"rec_grid_version_{remito_id}", 0) + 1
     else:
         for k in list(st.session_state.keys()):
             if k.startswith("view_items_grid_"):
                 st.session_state[k] = True
             elif k.startswith("item_selected_from_grid_"):
                 st.session_state[k] = False
+            elif k.startswith("rec_grid_version_"):
+                st.session_state[k] = st.session_state[k] + 1
     if set_focus:
         st.session_state.focus_target = "articulo"
     else:
@@ -100,7 +103,7 @@ def remitos_ventas():
 
     if st.session_state.should_reset_all:
         # Limpiar session state para nuevo remito
-        keys_to_clear = ["remito_activo_rec"] + [k for k in st.session_state.keys() if k.startswith("remito_rec_")]
+        keys_to_clear = ["remito_activo_rec"] + [k for k in list(st.session_state.keys()) if k.startswith("remito_rec_") or k.startswith("rec_grid_version_") or k.startswith("rec_base_df_") or k.startswith("editor_")]
         for k in keys_to_clear:
             st.session_state.pop(k, None)
         clear_item_inputs_rec()
@@ -146,6 +149,10 @@ def remitos_ventas():
                 st.session_state.excel_saved = False
                 st.session_state.remito_generado_msg = None
                 st.session_state.success_shown = False
+                st.session_state.pop(f"rec_grid_version_{remito_id}", None)
+                for k in list(st.session_state.keys()):
+                    if k.startswith(f"rec_base_df_{remito_id}_") or k.startswith(f"editor_{remito_id}_"):
+                        st.session_state.pop(k, None)
                 clear_item_inputs_rec()
             else:
                 st.session_state["carga_exitosa"] = False
@@ -270,6 +277,7 @@ def remitos_ventas():
                 )
 
             # === SECCIÓN CARGA Y ELIMINACIÓN DE ITEMS ===
+            st.markdown('<div id="seccion_carga_items_rec" style="scroll-margin-top: 80px;"></div>', unsafe_allow_html=True)
             st.header("Carga y Eliminación de Items")
 
             st.markdown(
@@ -466,6 +474,8 @@ def remitos_ventas():
                         st.session_state.remito_saved = False
                         st.session_state.should_clear_items_rec = True
                         st.session_state.remito_id_to_clear_rec = remito_id
+                        grid_ver_key = f"rec_grid_version_{remito_id}"
+                        st.session_state[grid_ver_key] = st.session_state.get(grid_ver_key, 0) + 1
                         st.rerun()
 
             if del_clicked:
@@ -482,6 +492,8 @@ def remitos_ventas():
                     st.session_state.item_rec_message = ("warning", "Artículo eliminado")
                     st.session_state.should_clear_items_rec = True
                     st.session_state.remito_id_to_clear_rec = remito_id
+                    grid_ver_key = f"rec_grid_version_{remito_id}"
+                    st.session_state[grid_ver_key] = st.session_state.get(grid_ver_key, 0) + 1
                     st.rerun()
 
             if "item_rec_message" in st.session_state and st.session_state.item_rec_message:
@@ -499,23 +511,30 @@ def remitos_ventas():
             grid_ver_key = f"rec_grid_version_{remito_id}"
             grid_ver = st.session_state.get(grid_ver_key, 0)
             editor_key = f"editor_{remito_id}_{grid_ver}"
+            base_df_key = f"rec_base_df_{remito_id}_{grid_ver}"
+
+            # Mantener un DataFrame base estable durante la edición para que Glide Data Grid
+            # conserve la celda activa (reborde rojo) y avance naturalmente con Enter a la fila siguiente (row + 1)
+            if base_df_key not in st.session_state:
+                df_init = st.session_state[items_key].copy().reset_index(drop=True)
+                if "Seleccionado" not in df_init.columns:
+                    df_init.insert(0, "Seleccionado", False)
+                st.session_state[base_df_key] = df_init
+
+            df_to_show = st.session_state[base_df_key]
 
             if show_grid:
                 st.subheader(f"Items del Remito #{remito_id}")
-                st.markdown("`Seleccione la primera columna de la grilla inferior para eliminar`")
+                st.markdown("`Seleccione la primera columna de la grilla inferior para eliminar. Para modificar celda: ENTER -> modificar ->ENTER`")
 
                 col_edit, col_calc = st.columns([4, 1], gap="small")
                 
-                num_items_rec = len(st.session_state[items_key]) if items_key in st.session_state else 0
-                rows_to_show = min(max(num_items_rec, 1), 10)
+                num_items_rec = len(df_to_show)
+                rows_to_show = max(num_items_rec, 1)
                 grid_height = int(39 + (rows_to_show * 35.5) + 4)
 
                 with col_edit:
                     st.markdown("#### Editar Devoluciones y Observaciones")
-                    
-                    df_to_show = st.session_state[items_key].copy().reset_index(drop=True)
-                    if "Seleccionado" not in df_to_show.columns:
-                        df_to_show.insert(0, "Seleccionado", False)
 
                     disabled_cols = ["nro_articulo", "descripcion"]
                     if st.session_state.is_form_disabled:
@@ -561,14 +580,42 @@ def remitos_ventas():
                         num_rows="fixed"
                     )
 
+                # Sincronizar inmediatamente los cambios hacia items_key para Vendidos y Totales
+                cols_to_sync = [c for c in edited_df.columns if c != "Seleccionado" and c in st.session_state[items_key].columns]
+                for col in cols_to_sync:
+                    st.session_state[items_key][col] = edited_df[col].values
+
                 if editor_key in st.session_state:
                     editor_changes = st.session_state[editor_key]
                     if isinstance(editor_changes, dict) and 'edited_rows' in editor_changes:
-                        edited_rows = editor_changes['edited_rows']
-                        for row_idx, changes in edited_rows.items():
-                            for col_name, new_value in changes.items():
+                        for row_idx_str, changes in editor_changes['edited_rows'].items():
+                            row_idx = int(row_idx_str)
+                            for col_name, new_val in changes.items():
                                 if col_name != "Seleccionado" and col_name in st.session_state[items_key].columns:
-                                    st.session_state[items_key].loc[row_idx, col_name] = new_value
+                                    st.session_state[items_key].loc[row_idx, col_name] = new_val
+
+                df_editado = st.session_state[items_key].copy()
+
+                with col_calc:
+                    st.markdown("#### Vendidos")
+                    if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
+                        devueltos_clean = pd.to_numeric(df_editado["devueltos"], errors="coerce").fillna(0).astype(int)
+                        entregados_clean = pd.to_numeric(df_editado["entregados"], errors="coerce").fillna(0).astype(int)
+                        vendidos_valores = (entregados_clean - devueltos_clean).clip(lower=0)
+
+                        vendidos_df = pd.DataFrame({"Vendidos": vendidos_valores})
+                        
+                        st.dataframe(
+                            vendidos_df,
+                            hide_index=True,
+                            width="stretch",
+                            height=grid_height,
+                            column_config={
+                                "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
+                            }
+                        )
+                    else:
+                        st.info("Datos no disponibles")
 
                 if "Seleccionado" in edited_df.columns:
                     selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
@@ -591,10 +638,67 @@ def remitos_ventas():
                         st.session_state[selected_from_grid_key] = True
                         st.session_state[view_grid_key] = False
                         st.session_state[grid_ver_key] = grid_ver + 1
+                        st.session_state.scroll_to_carga_rec = True
                         st.rerun()
 
-            df_editado = st.session_state[items_key].copy()
-            
+            else:
+                df_editado = st.session_state[items_key].copy() if items_key in st.session_state else pd.DataFrame()
+
+            # --- Totales y Utilidades (inmediatamente a continuación de las grillas) ---
+            total_entregados = 0
+            total_devueltos = 0
+            total_vendidos = 0
+            total_utilidades = 0.0
+
+            if isinstance(df_editado, pd.DataFrame) and not df_editado.empty and "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
+                try:
+                    entregados_clean = df_editado["entregados"].fillna(0).apply(lambda x: max(0, int(x)) if pd.notna(x) else 0)
+                    devueltos_clean = df_editado["devueltos"].fillna(0).apply(lambda x: max(0, int(x)) if pd.notna(x) else 0)
+                    vendidos_clean = (entregados_clean - devueltos_clean).clip(lower=0)
+
+                    total_entregados = int(entregados_clean.sum())
+                    total_devueltos = int(devueltos_clean.sum())
+                    total_vendidos = int(vendidos_clean.sum())
+
+                    porc_dto_val = float(cab.get("porc_dto", 0) or 0)
+
+                    precio_real_ser = df_editado["precio_real"].fillna(0).astype(float) if "precio_real" in df_editado.columns else pd.Series(0.0, index=df_editado.index)
+                    costo_ser = df_editado["costo"].fillna(0).astype(float) if "costo" in df_editado.columns else pd.Series(0.0, index=df_editado.index)
+
+                    utilidades_filas = []
+                    for idx in df_editado.index:
+                        p_real = float(precio_real_ser.loc[idx]) if idx in precio_real_ser.index else 0.0
+                        c_val = float(costo_ser.loc[idx]) if idx in costo_ser.index else 0.0
+                        v_cant = int(vendidos_clean.loc[idx]) if idx in vendidos_clean.index else 0
+
+                        if p_real > 0 and v_cant > 0:
+                            p_dto = p_real * (1.0 - (porc_dto_val / 100.0))
+                            u_unit = p_dto - c_val
+                            utilidades_filas.append(u_unit * v_cant)
+                        else:
+                            utilidades_filas.append(0.0)
+
+                    total_utilidades = float(sum(utilidades_filas))
+                except Exception as e_util:
+                    st.error(f"Error al calcular utilidades: {str(e_util)}")
+            else:
+                total_entregados = total_devueltos = total_vendidos = 0
+                total_utilidades = 0.0
+
+            col_tot_left, col_tot_right = st.columns([3, 1.4], gap="small")
+            with col_tot_left:
+                c1, c2, c3 = st.columns(3, gap="small")
+                c1.metric("Total Entregados", total_entregados)
+                c2.metric("Total Devueltos", total_devueltos)
+                c3.metric("Total Vendidos", total_vendidos)
+            with col_tot_right:
+                st.markdown(f"""
+                <div style="text-align: right; width: 100%;">
+                    <div style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.7); font-weight: 400; margin-bottom: 4px;">Utilidad del Remito</div>
+                    <div style="font-size: 2rem; font-weight: 600; color: var(--text-color, #ffffff); line-height: 1.2;">$ {total_utilidades:.2f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
             # VALIDAR grilla
             items_invalidos = pd.DataFrame()
             items_precio_invalidos = pd.DataFrame()
@@ -665,85 +769,6 @@ def remitos_ventas():
                 else:
                     fecha_retiro_error = False
 
-            if show_grid:
-                with col_calc:
-                    st.markdown("#### Vendidos")
-                    
-                    # Calcular vendidos como Entregados - Devueltos todo el tiempo
-                    if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
-                        devueltos_clean = df_editado["devueltos"].fillna(0).astype(int)
-                        entregados_clean = df_editado["entregados"].fillna(0).astype(int)
-                        vendidos_valores = (entregados_clean - devueltos_clean).clip(lower=0)
-
-                        vendidos_df = pd.DataFrame({"Vendidos": vendidos_valores})
-                        
-                        st.dataframe(
-                            vendidos_df,
-                            hide_index=True,
-                            width="stretch",
-                            height=grid_height,
-                            column_config={
-                                "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
-                            }
-                        )
-                    else:
-                        st.info("Datos no disponibles")
-
-            # --- Totales y Utilidades ---
-            total_entregados = 0
-            total_devueltos = 0
-            total_vendidos = 0
-            total_utilidades = 0.0
-
-            if isinstance(df_editado, pd.DataFrame) and not df_editado.empty and "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
-                try:
-                    entregados_clean = df_editado["entregados"].fillna(0).apply(lambda x: max(0, int(x)) if pd.notna(x) else 0)
-                    devueltos_clean = df_editado["devueltos"].fillna(0).apply(lambda x: max(0, int(x)) if pd.notna(x) else 0)
-                    vendidos_clean = (entregados_clean - devueltos_clean).clip(lower=0)
-
-                    total_entregados = int(entregados_clean.sum())
-                    total_devueltos = int(devueltos_clean.sum())
-                    total_vendidos = int(vendidos_clean.sum())
-
-                    porc_dto_val = float(cab.get("porc_dto", 0) or 0)
-
-                    precio_real_ser = df_editado["precio_real"].fillna(0).astype(float) if "precio_real" in df_editado.columns else pd.Series(0.0, index=df_editado.index)
-                    costo_ser = df_editado["costo"].fillna(0).astype(float) if "costo" in df_editado.columns else pd.Series(0.0, index=df_editado.index)
-
-                    utilidades_filas = []
-                    for idx in df_editado.index:
-                        p_real = float(precio_real_ser.loc[idx]) if idx in precio_real_ser.index else 0.0
-                        c_val = float(costo_ser.loc[idx]) if idx in costo_ser.index else 0.0
-                        v_cant = int(vendidos_clean.loc[idx]) if idx in vendidos_clean.index else 0
-
-                        if p_real > 0 and v_cant > 0:
-                            p_dto = p_real * (1.0 - (porc_dto_val / 100.0))
-                            u_unit = p_dto - c_val
-                            utilidades_filas.append(u_unit * v_cant)
-                        else:
-                            utilidades_filas.append(0.0)
-
-                    total_utilidades = float(sum(utilidades_filas))
-                except Exception as e_util:
-                    st.error(f"Error al calcular utilidades: {str(e_util)}")
-            else:
-                total_entregados = total_devueltos = total_vendidos = 0
-                total_utilidades = 0.0
-
-            col_tot_left, col_tot_right = st.columns([3, 1.4], gap="small")
-            with col_tot_left:
-                c1, c2, c3 = st.columns(3, gap="small")
-                c1.metric("Total Entregados", total_entregados)
-                c2.metric("Total Devueltos", total_devueltos)
-                c3.metric("Total Vendidos", total_vendidos)
-            with col_tot_right:
-                st.markdown(f"""
-                <div style="text-align: right; width: 100%;">
-                    <div style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.7); font-weight: 400; margin-bottom: 4px;">Utilidad del Remito</div>
-                    <div style="font-size: 2rem; font-weight: 600; color: var(--text-color, #ffffff); line-height: 1.2;">$ {total_utilidades:.2f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
             # === BOTONES PRINCIPALES (siguiendo la lógica de remitos_entregas.py) ===
             st.header("Acciones del Remito")
 
@@ -779,6 +804,8 @@ def remitos_ventas():
 
                             st.session_state.remito_saved = True
                             st.session_state.success_shown = False  # Para mostrar el mensaje
+                            grid_ver_key = f"rec_grid_version_{remito_id}"
+                            st.session_state[grid_ver_key] = st.session_state.get(grid_ver_key, 0) + 1
                             # Forzar rerun para actualizar el estado de los botones
                             st.rerun()
                         except Exception as e:
@@ -881,6 +908,8 @@ def remitos_ventas():
     target_to_focus = st.session_state.get('focus_target', '')
     if target_to_focus:
         st.session_state.focus_target = ''
+
+    scroll_to_carga = st.session_state.pop('scroll_to_carga_rec', False)
 
     is_remito_activo = "remito_activo_rec" in st.session_state and st.session_state["remito_activo_rec"] is not None
     focus_script = ""
@@ -1220,6 +1249,34 @@ def remitos_ventas():
                     if (attempts >= maxAttempts) clearInterval(interval);
                 }}
                 if (attempts >= maxAttempts) clearInterval(interval);
+            }}, 25);
+        }}
+
+        // Salto a 'Carga y Eliminación de Items' cuando se marca un artículo en la primera columna
+        const shouldScrollToCarga = {'true' if scroll_to_carga else 'false'};
+        if (shouldScrollToCarga) {{
+            let scrollAttempts = 0;
+            const maxScrollAttempts = 30;
+            const scrollInterval = setInterval(function() {{
+                scrollAttempts++;
+                try {{
+                    const doc = window.parent.document;
+                    const el = doc.getElementById('seccion_carga_items_rec') ||
+                               Array.from(doc.querySelectorAll('h2, h3, h1, [data-testid="stHeadingWithActionElements"]'))
+                                    .find(h => (h.innerText || h.textContent || '').includes('Carga y Eliminación de Items'));
+                    if (el) {{
+                        el.scrollIntoView({{ behavior: 'auto', block: 'start' }});
+                        const mainContainer = doc.querySelector('.main, section.main, div[data-testid="stAppViewContainer"]');
+                        if (mainContainer) {{
+                            const rect = el.getBoundingClientRect();
+                            mainContainer.scrollTop = mainContainer.scrollTop + rect.top - 70;
+                        }}
+                        if (scrollAttempts > 5) clearInterval(scrollInterval);
+                    }}
+                }} catch(e) {{
+                    if (scrollAttempts >= maxScrollAttempts) clearInterval(scrollInterval);
+                }}
+                if (scrollAttempts >= maxScrollAttempts) clearInterval(scrollInterval);
             }}, 25);
         }}
     </script>
