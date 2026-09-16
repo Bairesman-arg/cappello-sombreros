@@ -7,6 +7,9 @@ st.set_page_config(
 )
 
 from streamlit_option_menu import option_menu
+import sys, os, time, traceback
+import datetime
+import models
 from gen_barcode import gen_barcode
 from update_art import update_art
 from clientes import clientes_crud
@@ -14,9 +17,6 @@ from articulos import articulos_crud
 from remitos_ventas import remitos_ventas
 from remitos_anulaciones import remitos_anulaciones
 import remitos_entregas as rem_ent
-import sys, os, time, traceback
-import datetime
-import models
 
 # This will create the engine
 # TITLE -- coding utf-8 --
@@ -163,7 +163,6 @@ def app():
         st.markdown("<div style='margin-bottom: 0.4rem;'></div>", unsafe_allow_html=True)
 
         # Control de estado de navegación
-        menu_v = st.session_state.get("menu_version", 0)
         if 'currentpage' not in st.session_state:
             st.session_state.currentpage = 'Codigos de Barra'
 
@@ -196,16 +195,17 @@ def app():
             "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "14px", "font-weight": "600"},
         }
 
-        # MENÚ PRINCIPAL - Incluye Rubros, Informes y Backup
-        main_selected = option_menu(menu_title=None,
-                               options=main_options,
-                               icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
-                               menu_icon="app-indicator",
-                               default_index=default_main_index,
-                               styles=menu_styles,
-                               key=f"main_menu_nav_{menu_v}")
+        # MENÚ PRINCIPAL
+        main_selected = option_menu(
+            menu_title=None,
+            options=main_options,
+            icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
+            menu_icon="app-indicator",
+            default_index=default_main_index,
+            styles=menu_styles,
+            key="main_menu_nav"
+        )
 
-        # Solo si main_selected devuelve un valor válido (evita rehidratación asíncrona de iframe en la nube)
         if main_selected and main_selected != st.session_state.get("currentpage"):
             st.session_state.currentpage = main_selected
             if main_selected == "Remitos":
@@ -218,6 +218,7 @@ def app():
                 st.session_state["backup_sub_nav"] = "Crear Backup"
             for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
                 st.session_state.pop(clave, None)
+            st.rerun()
 
         mainmenu = st.session_state.get("currentpage", "Codigos de Barra")
 
@@ -226,14 +227,19 @@ def app():
             cur_rem_sub = st.session_state.get("remitos_sub_nav", "Entregas")
             def_rem_idx = rem_options.index(cur_rem_sub) if cur_rem_sub in rem_options else 0
 
-            sub_selected = option_menu(menu_title="Remitos",
-                                  options=rem_options,
-                                  icons=["file-earmark-plus", "pencil", "search", "file-earmark-minus"],
-                                  menu_icon="folder", default_index=def_rem_idx, orientation="vertical",
-                                  styles=submenu_styles,
-                                  key=f"remitos_sub_nav_{menu_v}")
-            if sub_selected:
+            sub_selected = option_menu(
+                menu_title="Remitos",
+                options=rem_options,
+                icons=["file-earmark-plus", "pencil", "search", "file-earmark-minus"],
+                menu_icon="folder",
+                default_index=def_rem_idx,
+                orientation="vertical",
+                styles=submenu_styles,
+                key="remitos_sub_nav_menu"
+            )
+            if sub_selected and sub_selected != st.session_state.get("remitos_sub_nav"):
                 st.session_state["remitos_sub_nav"] = sub_selected
+                st.rerun()
             submenu = st.session_state.get("remitos_sub_nav", "Entregas")
 
         elif mainmenu == "Articulos":
@@ -241,14 +247,19 @@ def app():
             cur_art_sub = st.session_state.get("articulos_sub_nav", "ABM Articulos")
             def_art_idx = art_options.index(cur_art_sub) if cur_art_sub in art_options else 0
 
-            sub_selected = option_menu(menu_title="Articulos",
-                                  options=art_options,
-                                  icons=["file-earmark-plus", "file-earmark-plus"],
-                                  menu_icon="folder", default_index=def_art_idx, orientation="vertical",
-                                  styles=submenu_styles,
-                                  key=f"articulos_sub_nav_{menu_v}")
-            if sub_selected:
+            sub_selected = option_menu(
+                menu_title="Articulos",
+                options=art_options,
+                icons=["file-earmark-plus", "file-earmark-plus"],
+                menu_icon="folder",
+                default_index=def_art_idx,
+                orientation="vertical",
+                styles=submenu_styles,
+                key="articulos_sub_nav_menu"
+            )
+            if sub_selected and sub_selected != st.session_state.get("articulos_sub_nav"):
                 st.session_state["articulos_sub_nav"] = sub_selected
+                st.rerun()
             submenu = st.session_state.get("articulos_sub_nav", "ABM Articulos")
 
         elif mainmenu == "Informes":
@@ -256,33 +267,39 @@ def app():
             cur_inf_sub = st.session_state.get("informes_sub_nav", "Ganancias por Día")
             def_inf_idx = inf_options.index(cur_inf_sub) if cur_inf_sub in inf_options else 0
 
-            sub_selected = option_menu(menu_title="Informes",
-                                  options=inf_options,
-                                  icons=["graph-up-arrow", "building", "box-seam"],
-                                  menu_icon="graph-up", 
-                                  default_index=def_inf_idx, 
-                                  orientation="vertical",
-                                  styles=submenu_styles,
-                                  key=f"informes_sub_nav_{menu_v}")
-            if sub_selected:
+            sub_selected = option_menu(
+                menu_title="Informes",
+                options=inf_options,
+                icons=["graph-up-arrow", "building", "box-seam"],
+                menu_icon="graph-up",
+                default_index=def_inf_idx,
+                orientation="vertical",
+                styles=submenu_styles,
+                key="informes_sub_nav_menu"
+            )
+            if sub_selected and sub_selected != st.session_state.get("informes_sub_nav"):
                 st.session_state["informes_sub_nav"] = sub_selected
+                st.rerun()
             submenu = st.session_state.get("informes_sub_nav", "Ganancias por Día")
-        
+
         elif mainmenu == "Backup":
             bak_options = ["Crear Backup", "Restaurar Backup"]
             cur_bak_sub = st.session_state.get("backup_sub_nav", "Crear Backup")
             def_bak_idx = bak_options.index(cur_bak_sub) if cur_bak_sub in bak_options else 0
 
-            sub_selected = option_menu(menu_title="Backup",
-                                  options=bak_options,
-                                  icons=["download", "upload"],
-                                  menu_icon="shield-check", 
-                                  default_index=def_bak_idx, 
-                                  orientation="vertical",
-                                  styles=submenu_styles,
-                                  key=f"backup_sub_nav_{menu_v}")
-            if sub_selected:
+            sub_selected = option_menu(
+                menu_title="Backup",
+                options=bak_options,
+                icons=["download", "upload"],
+                menu_icon="shield-check",
+                default_index=def_bak_idx,
+                orientation="vertical",
+                styles=submenu_styles,
+                key="backup_sub_nav_menu"
+            )
+            if sub_selected and sub_selected != st.session_state.get("backup_sub_nav"):
                 st.session_state["backup_sub_nav"] = sub_selected
+                st.rerun()
             submenu = st.session_state.get("backup_sub_nav", "Crear Backup")
         else:
             submenu = None
