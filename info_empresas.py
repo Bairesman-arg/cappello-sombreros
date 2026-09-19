@@ -321,7 +321,7 @@ def info_empresas_ranking():
         ).properties(
             height=max(300, len(df_chart) * 35)
         )
-        st.altair_chart(chart_util, use_container_width=True)
+        st.altair_chart(chart_util, width="stretch")
         mostrar_explicacion_e("Utilidad por Empresa ($)", "Muestra el ranking de clientes ordenados por la ganancia total que aportaron en el mes. Permite identificar a tus clientes comercialmente más rentables.", "#ff4b4b")
 
     with tab_g2:
@@ -341,7 +341,7 @@ def info_empresas_ranking():
         ).properties(
             height=max(300, len(df_chart) * 35)
         )
-        st.altair_chart(chart_cant, use_container_width=True)
+        st.altair_chart(chart_cant, width="stretch")
         mostrar_explicacion_e("Artículos por Empresa", "Muestra la cantidad total de unidades compradas por cada cliente en el período. Permite evaluar cuáles son tus clientes de mayor volumen físico.", "#00c49f")
 
     with tab_g3:
@@ -391,7 +391,7 @@ def info_empresas_ranking():
         chart_pie = alt.layer(main_arc, otros_arc).properties(
             height=360
         )
-        st.altair_chart(chart_pie, use_container_width=True)
+        st.altair_chart(chart_pie, width="stretch")
         mostrar_explicacion_e("Participación % en Utilidad", "Representa la porción que aporta cada empresa sobre la ganancia total del mes. Muestra individualmente a los 10 primeros clientes y destaca la porción 'Otros' desprendida de la torta.", "#29b6f6")
 
     with tab_g4:
@@ -418,7 +418,7 @@ def info_empresas_ranking():
             text='Nombre del Cliente:N'
         )
 
-        st.altair_chart(chart_scatter + chart_scatter_text, use_container_width=True)
+        st.altair_chart(chart_scatter + chart_scatter_text, width="stretch")
         mostrar_explicacion_e("Matriz de Rentabilidad (Cantidad vs. Utilidad $)", "Relaciona el volumen de artículos frente a la ganancia obtenida. Permite detectar clientes VIP/Alto Margen (baja cantidad, alta ganancia) vs. clientes de Alto Volumen (muchas unidades pero menor margen).", "#1e88e5")
 
     with tab_g5:
@@ -459,7 +459,7 @@ def info_empresas_ranking():
         ).properties(
             height=360
         )
-        st.altair_chart(chart_top10, use_container_width=True)
+        st.altair_chart(chart_top10, width="stretch")
         mostrar_explicacion_e("Top 10 Clientes vs. Resto", "Compara en una sola vista la ganancia generada por tus 10 clientes principales frente a la suma del resto del mercado.", "#ff9800")
 
     with tab_g6:
@@ -480,7 +480,7 @@ def info_empresas_ranking():
         ).properties(
             height=max(300, len(df_prom) * 35)
         )
-        st.altair_chart(chart_prom_emp, use_container_width=True)
+        st.altair_chart(chart_prom_emp, width="stretch")
         mostrar_explicacion_e("Utilidad Promedio por Remito ($ / Remito)", "Muestra qué clientes compran mediante operaciones/remitos grandes (alto valor unitario) frente a clientes que hacen muchos pedidos pequeños.", "#ab47bc")
 
     with tab_g7:
@@ -566,7 +566,7 @@ def info_empresas_ranking():
             chart_pareto_final = (chart_pareto + rule_80_y).resolve_scale(x='shared', y='shared')
             explicacion_pareto = "Muestra la curva acumulada de participación comercial (de 0% a 100%). Permite verificar si se cumple la Regla 80/20 (el 20% de las empresas genera el 80% de tus ingresos)."
 
-        st.altair_chart(chart_pareto_final, use_container_width=True)
+        st.altair_chart(chart_pareto_final, width="stretch")
         mostrar_explicacion_e("Análisis de Concentración Pareto (Acumulado %)", explicacion_pareto, "#7c4dff")
 
     st.markdown("---")

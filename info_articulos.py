@@ -326,7 +326,7 @@ def info_articulos_ranking():
         ).properties(
             height=max(300, len(df_chart) * 35)
         )
-        st.altair_chart(chart_util, use_container_width=True)
+        st.altair_chart(chart_util, width="stretch")
         mostrar_explicacion_e("Utilidad por Artículo ($)", "Aporta valor al mostrar el ranking de productos ordenados por la ganancia neta total generada en el mes. Permite identificar de inmediato tus productos comercialmente más rentables.", "#ff4b4b")
 
     with tab_g2:
@@ -347,7 +347,7 @@ def info_articulos_ranking():
         ).properties(
             height=max(300, len(df_chart) * 35)
         )
-        st.altair_chart(chart_cant, use_container_width=True)
+        st.altair_chart(chart_cant, width="stretch")
         mostrar_explicacion_e("Unidades Vendidas por Artículo", "Aporta valor al medir el volumen físico de salida del depósito. Permite detectar qué artículos tienen mayor rotación de stock independientemente de su precio.", "#00c49f")
 
     with tab_g3:
@@ -396,7 +396,7 @@ def info_articulos_ranking():
         chart_pie = alt.layer(main_arc, otros_arc).properties(
             height=360
         )
-        st.altair_chart(chart_pie, use_container_width=True)
+        st.altair_chart(chart_pie, width="stretch")
         mostrar_explicacion_e("Participación % en Utilidad", "Aporta valor al visualizar la ponderación relativa del Top 10 de catálogo sobre las ganancias mensuales del negocio, destacando el bloque sobrante 'Otros'.", "#29b6f6")
 
     with tab_g4:
@@ -421,7 +421,7 @@ def info_articulos_ranking():
         ).properties(
             height=max(250, len(df_rubro) * 40)
         )
-        st.altair_chart(chart_rubro, use_container_width=True)
+        st.altair_chart(chart_rubro, width="stretch")
         mostrar_explicacion_e("Utilidad por Rubro ($)", "Aporta valor al agrupar la ganancia neta por categoría de producto (ej. Gorras, Sombreros), permitiendo identificar cuáles son las familias comercialmente más rentables para la empresa.", "#29b6f6")
 
     with tab_g5:
@@ -462,7 +462,7 @@ def info_articulos_ranking():
         ).properties(
             height=360
         )
-        st.altair_chart(chart_top10, use_container_width=True)
+        st.altair_chart(chart_top10, width="stretch")
         mostrar_explicacion_e("Top 10 Artículos vs. Resto", "Aporta valor al contrastar el aporte económico del Top 10 de productos principales frente al resto de la oferta comercial de la empresa.", "#ff9800")
 
     with tab_g6:
@@ -484,7 +484,7 @@ def info_articulos_ranking():
         ).properties(
             height=max(300, len(df_prom) * 35)
         )
-        st.altair_chart(chart_prom_art, use_container_width=True)
+        st.altair_chart(chart_prom_art, width="stretch")
         mostrar_explicacion_e("Ganancia Promedio por Unidad ($ / Unid)", "Aporta valor al revelar cuántos pesos netos de utilidad deja la venta de cada unidad individual, clave para analizar listas de precios y costos de reposición.", "#ab47bc")
 
     with tab_g7:
@@ -571,7 +571,7 @@ def info_articulos_ranking():
             chart_pareto_final = (chart_pareto + rule_80_y).resolve_scale(x='shared', y='shared')
             explicacion_pareto = "Aporta valor al aplicar el principio 80/20 de inventario ABC. Permite comprobar qué porcentaje exacto de tu catálogo representa el 80% de tus utilidades mensuales."
 
-        st.altair_chart(chart_pareto_final, use_container_width=True)
+        st.altair_chart(chart_pareto_final, width="stretch")
         mostrar_explicacion_e("Análisis de Concentración Pareto (Acumulado %)", explicacion_pareto, "#7c4dff")
 
     st.markdown("---")

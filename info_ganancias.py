@@ -316,7 +316,7 @@ def info_ganancias_dia():
         ).properties(
             height=340
         )
-        st.altair_chart(chart_util, use_container_width=True)
+        st.altair_chart(chart_util, width="stretch")
         mostrar_explicacion_g("Utilidad Diaria ($)", "Muestra la ganancia neta obtenida en cada día del mes por las entregas y retiros registrados. Permite detectar picos y caídas en la rentabilidad diaria.", "#ff4b4b")
 
     with tab_g2:
@@ -335,7 +335,7 @@ def info_ganancias_dia():
         ).properties(
             height=340
         )
-        st.altair_chart(chart_cant, use_container_width=True)
+        st.altair_chart(chart_cant, width="stretch")
         mostrar_explicacion_g("Artículos Vendidos", "Muestra el volumen total de unidades comercializadas cada día. Permite correlacionar los días de mayor movimiento físico con la utilidad generada.", "#00c49f")
 
     with tab_g3:
@@ -357,7 +357,7 @@ def info_ganancias_dia():
         ).properties(
             height=340
         )
-        st.altair_chart(chart_acum_line, use_container_width=True)
+        st.altair_chart(chart_acum_line, width="stretch")
         mostrar_explicacion_g("Evolución Acumulada ($)", "Muestra la curva de crecimiento progresivo de las ganancias a lo largo del mes. Permite proyectar el cumplimiento de metas mensuales.", "#29b6f6")
 
     with tab_g4:
@@ -388,7 +388,7 @@ def info_ganancias_dia():
         ).properties(
             height=340
         )
-        st.altair_chart(chart_dow, use_container_width=True)
+        st.altair_chart(chart_dow, width="stretch")
         mostrar_explicacion_g("Rendimiento por Día de la Semana", "Agrupa los ingresos según el día de la semana (Lunes a Domingo). Permite identificar los días de mayor actividad comercial para optimizar logística y cobranza.", "#ab47bc")
 
     with tab_g5:
@@ -426,7 +426,7 @@ def info_ganancias_dia():
         ).properties(
             height=340
         )
-        st.altair_chart(chart_sem, use_container_width=True)
+        st.altair_chart(chart_sem, width="stretch")
         mostrar_explicacion_g("Rendimiento por Semana del Mes", "Compara el desempeño financiero por tramos semanales del mes. Permite evaluar el comportamiento de compra entre la 1ª y la 2ª quincena.", "#26a69a")
 
     with tab_g6:
@@ -446,7 +446,7 @@ def info_ganancias_dia():
         ).properties(
             height=340
         )
-        st.altair_chart(chart_prom, use_container_width=True)
+        st.altair_chart(chart_prom, width="stretch")
         mostrar_explicacion_g("Utilidad Promedio por Remito ($)", "Muestra el valor medio de ganancia por cada operación o remito procesado en el día. Permite distinguir entre días de operaciones de alto valor frente a días de pedidos menores.", "#ff9800")
 
     st.markdown("---")
