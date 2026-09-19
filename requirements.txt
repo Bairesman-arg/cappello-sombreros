@@ -4,7 +4,6 @@ python-barcode
 Pillow
 streamlit>=1.45.1
 reportlab
-streamlit_option_menu
 sqlalchemy
 setuptools
 psycopg2-binary
