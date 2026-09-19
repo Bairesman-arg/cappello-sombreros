@@ -328,7 +328,7 @@ def clientes_crud():
                 on_click=on_del_click, width="stretch"
             )
         with col_clear:
-            if st.form_submit_button("Limpiar Formulario 🔄", width="stretch"):
+            if st.form_submit_button("Limpiar Formulario 🧹", width="stretch"):
                 del st.session_state.selected_cliente_id
                 st.session_state.view_grilla = True
                 st.rerun()

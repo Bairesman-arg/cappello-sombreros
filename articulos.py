@@ -342,7 +342,7 @@ def articulos_crud():
                 on_click=on_del_click, width="stretch"
             )
         with col_clear:
-            if st.form_submit_button("Limpiar Formulario 🔄", 
+            if st.form_submit_button("Limpiar Formulario 🧹", 
                                      width="stretch",
                                      disabled=is_clear_disabled):
                 del st.session_state.selected_articulo_id

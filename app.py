@@ -6,7 +6,6 @@ st.set_page_config(
     layout="wide"
 )
 
-from streamlit_option_menu import option_menu
 import sys, os, time, traceback
 import datetime
 import models
@@ -122,7 +121,8 @@ def app():
                 }
                 [data-testid="stSidebarUserContent"],
                 section[data-testid="stSidebar"] > div {
-                    padding-top: 0.5rem !important;
+                    padding-top: 0.4rem !important;
+                    padding-bottom: 1.5rem !important;
                 }
                 [data-testid="stSidebarHeader"],
                 [data-testid="stSidebarNav"],
@@ -130,179 +130,115 @@ def app():
                 div[data-testid="stSidebarNavSeparator"] {
                     display: none !important;
                 }
-                [data-testid="stSidebar"] button,
-                [data-testid="stSidebar"] button div,
-                [data-testid="stSidebar"] button p {
-                    font-size: 0.78rem !important;
-                    font-weight: 500 !important;
+                /* Espaciado compacto pero limpio entre elementos */
+                [data-testid="stSidebar"] div[data-testid="stVerticalBlock"],
+                [data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] {
+                    gap: 0.35rem !important;
+                }
+                .sidebar-section-title {
+                    display: block !important;
+                    font-size: 0.98rem;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    letter-spacing: 0.6px;
+                    color: #ffffff;
+                    margin-top: 1rem !important;
+                    margin-bottom: 0.55rem !important;
+                    padding-left: 0.3rem;
+                    padding-bottom: 0.3rem;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+                    line-height: 1.4 !important;
                 }
                 [data-testid="stSidebar"] button {
-                    padding: 0.2rem 0.5rem !important;
-                    min-height: 1.9rem !important;
+                    display: flex !important;
+                    justify-content: flex-start !important;
+                    align-items: center !important;
+                    text-align: left !important;
+                    padding: 0.22rem 0.65rem !important;
+                    min-height: 1.85rem !important;
+                    margin: 0 !important;
+                    border-radius: 6px !important;
+                    width: 100% !important;
+                }
+                [data-testid="stSidebar"] button > div,
+                [data-testid="stSidebar"] button [data-testid="stMarkdownContainer"] {
+                    display: flex !important;
+                    justify-content: flex-start !important;
+                    text-align: left !important;
+                    width: 100% !important;
+                }
+                [data-testid="stSidebar"] button p,
+                [data-testid="stSidebar"] button div p {
+                    font-size: 0.80rem !important;
+                    font-weight: 500 !important;
+                    text-align: left !important;
+                    justify-content: flex-start !important;
+                    line-height: 1.3 !important;
+                    margin: 0 !important;
+                    width: 100% !important;
                 }
             </style>
             """,
             unsafe_allow_html=True,
         )
 
-        # Botón arriba de todo para reiniciar el sistema (Ctrl+F5)
-        if st.button("🔄 Reiniciar Sistema Capello", width="stretch", help="Recargar la aplicación desde el Servidor (Ctrl+F5)"):
-            st.components.v1.html(
-                """
-                <script>
-                    try {
-                        window.top.location.reload(true);
-                    } catch(e) {
-                        window.parent.location.reload(true);
-                    }
-                </script>
-                """,
-                height=0,
-            )
 
-        st.markdown("<div style='margin-bottom: 0.4rem;'></div>", unsafe_allow_html=True)
 
-        # Control de estado de navegación
+        # Inicialización de estados de navegación
         if 'currentpage' not in st.session_state:
             st.session_state.currentpage = 'Codigos de Barra'
+        if 'remitos_sub_nav' not in st.session_state:
+            st.session_state.remitos_sub_nav = 'Entregas'
+        if 'articulos_sub_nav' not in st.session_state:
+            st.session_state.articulos_sub_nav = 'ABM Articulos'
+        if 'informes_sub_nav' not in st.session_state:
+            st.session_state.informes_sub_nav = 'Ganancias por Día'
+        if 'backup_sub_nav' not in st.session_state:
+            st.session_state.backup_sub_nav = 'Crear Backup'
 
-        main_options = ["Codigos de Barra", "Clientes", "Articulos", "Rubros", "Remitos", "Informes", "Backup"]
-        current_page = st.session_state.currentpage
-        default_main_index = main_options.index(current_page) if current_page in main_options else 0
+        def nav_item(label, page, sub_page=None, key=None):
+            is_active = (st.session_state.currentpage == page)
+            if sub_page is not None:
+                is_active = is_active and (st.session_state.get(f"{page.lower()}_sub_nav") == sub_page)
+            
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=key or f"nav_{page}_{sub_page or 'main'}", width="stretch", type=btn_type):
+                if not is_active:
+                    st.session_state.currentpage = page
+                    if sub_page is not None:
+                        st.session_state[f"{page.lower()}_sub_nav"] = sub_page
+                    for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
+                        st.session_state.pop(clave, None)
+                    st.rerun()
 
-        menu_styles = {
-            "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#fafafa", "font-size": "15px"},
-            "nav-link": {
-                "font-size": "15px",
-                "text-align": "left",
-                "margin": "3px 0px",
-                "padding": "6px 10px",
-            },
-            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "15px", "font-weight": "600"},
-        }
+        # --- SECCIÓN GENERAL ---
+        st.markdown("<div class='sidebar-section-title'>📋 General</div>", unsafe_allow_html=True)
+        nav_item("🏷️ Códigos de Barra", "Codigos de Barra")
+        nav_item("👥 Clientes", "Clientes")
+        nav_item("📝 Artículos", "Articulos", "ABM Articulos")
+        nav_item("🔖 Rubros", "Rubros")
 
-        submenu_styles = {
-            "container": {"padding": "0!important", "background-color": "transparent"},
-            "icon": {"color": "#fafafa", "font-size": "14px"},
-            "title": {"font-size": "15px", "font-weight": "600"},
-            "nav-link": {
-                "font-size": "14px",
-                "text-align": "left",
-                "margin": "3px 0px",
-                "padding": "5px 10px",
-            },
-            "nav-link-selected": {"background-color": "#ff4b4b", "font-size": "14px", "font-weight": "600"},
-        }
+        # --- SECCIÓN REMITOS (SIEMPRE ABIERTA) ---
+        st.markdown("<div class='sidebar-section-title'>📦 Remitos</div>", unsafe_allow_html=True)
+        nav_item("➕ Entregas (Carga)", "Remitos", "Entregas")
+        nav_item("📥 Recepciones (Ventas)", "Remitos", "Recepciones")
+        nav_item("🔍 Consultas", "Remitos", "Consultas")
+        nav_item("❌ Anulaciones", "Remitos", "Anulaciones")
 
-        # MENÚ PRINCIPAL
-        main_selected = option_menu(
-            menu_title=None,
-            options=main_options,
-            icons=["file", "pencil", "pencil", "tag", "truck", "graph-up-arrow", "shield-check"],
-            menu_icon="app-indicator",
-            default_index=default_main_index,
-            styles=menu_styles,
-            key="main_menu_nav"
-        )
+        # --- SECCIÓN INFORMES ---
+        st.markdown("<div class='sidebar-section-title'>📊 Informes</div>", unsafe_allow_html=True)
+        nav_item("📈 Ganancias por Día", "Informes", "Ganancias por Día")
+        nav_item("🏢 Ranking por Empresa", "Informes", "Ranking por Empresa")
+        nav_item("🧢 Ranking por Artículo", "Informes", "Ranking por Artículo")
 
-        if main_selected and main_selected != st.session_state.get("currentpage"):
-            st.session_state.currentpage = main_selected
-            if main_selected == "Remitos":
-                st.session_state["remitos_sub_nav"] = "Entregas"
-            elif main_selected == "Articulos":
-                st.session_state["articulos_sub_nav"] = "ABM Articulos"
-            elif main_selected == "Informes":
-                st.session_state["informes_sub_nav"] = "Ganancias por Día"
-            elif main_selected == "Backup":
-                st.session_state["backup_sub_nav"] = "Crear Backup"
-            for clave in ['clientes_df', 'articulos_df', 'backup_manager']:
-                st.session_state.pop(clave, None)
-            st.rerun()
+        # --- SECCIÓN SISTEMA ---
+        st.markdown("<div class='sidebar-section-title'>🛡️ Sistema</div>", unsafe_allow_html=True)
+        nav_item("💾 Crear Backup", "Backup", "Crear Backup")
+        nav_item("🔄 Restaurar Backup", "Backup", "Restaurar Backup")
+        nav_item("📂 Carga de Artículos", "Articulos", "Cargar Novedades")
 
         mainmenu = st.session_state.get("currentpage", "Codigos de Barra")
-
-        if mainmenu == "Remitos":
-            rem_options = ["Entregas", "Recepciones", "Consultas", "Anulaciones"]
-            cur_rem_sub = st.session_state.get("remitos_sub_nav", "Entregas")
-            def_rem_idx = rem_options.index(cur_rem_sub) if cur_rem_sub in rem_options else 0
-
-            sub_selected = option_menu(
-                menu_title="Remitos",
-                options=rem_options,
-                icons=["file-earmark-plus", "pencil", "search", "file-earmark-minus"],
-                menu_icon="folder",
-                default_index=def_rem_idx,
-                orientation="vertical",
-                styles=submenu_styles,
-                key="remitos_sub_nav_menu"
-            )
-            if sub_selected and sub_selected != st.session_state.get("remitos_sub_nav"):
-                st.session_state["remitos_sub_nav"] = sub_selected
-                st.rerun()
-            submenu = st.session_state.get("remitos_sub_nav", "Entregas")
-
-        elif mainmenu == "Articulos":
-            art_options = ["ABM Articulos", "Cargar Novedades"]
-            cur_art_sub = st.session_state.get("articulos_sub_nav", "ABM Articulos")
-            def_art_idx = art_options.index(cur_art_sub) if cur_art_sub in art_options else 0
-
-            sub_selected = option_menu(
-                menu_title="Articulos",
-                options=art_options,
-                icons=["file-earmark-plus", "file-earmark-plus"],
-                menu_icon="folder",
-                default_index=def_art_idx,
-                orientation="vertical",
-                styles=submenu_styles,
-                key="articulos_sub_nav_menu"
-            )
-            if sub_selected and sub_selected != st.session_state.get("articulos_sub_nav"):
-                st.session_state["articulos_sub_nav"] = sub_selected
-                st.rerun()
-            submenu = st.session_state.get("articulos_sub_nav", "ABM Articulos")
-
-        elif mainmenu == "Informes":
-            inf_options = ["Ganancias por Día", "Ranking por Empresa", "Ranking por Artículo"]
-            cur_inf_sub = st.session_state.get("informes_sub_nav", "Ganancias por Día")
-            def_inf_idx = inf_options.index(cur_inf_sub) if cur_inf_sub in inf_options else 0
-
-            sub_selected = option_menu(
-                menu_title="Informes",
-                options=inf_options,
-                icons=["graph-up-arrow", "building", "box-seam"],
-                menu_icon="graph-up",
-                default_index=def_inf_idx,
-                orientation="vertical",
-                styles=submenu_styles,
-                key="informes_sub_nav_menu"
-            )
-            if sub_selected and sub_selected != st.session_state.get("informes_sub_nav"):
-                st.session_state["informes_sub_nav"] = sub_selected
-                st.rerun()
-            submenu = st.session_state.get("informes_sub_nav", "Ganancias por Día")
-
-        elif mainmenu == "Backup":
-            bak_options = ["Crear Backup", "Restaurar Backup"]
-            cur_bak_sub = st.session_state.get("backup_sub_nav", "Crear Backup")
-            def_bak_idx = bak_options.index(cur_bak_sub) if cur_bak_sub in bak_options else 0
-
-            sub_selected = option_menu(
-                menu_title="Backup",
-                options=bak_options,
-                icons=["download", "upload"],
-                menu_icon="shield-check",
-                default_index=def_bak_idx,
-                orientation="vertical",
-                styles=submenu_styles,
-                key="backup_sub_nav_menu"
-            )
-            if sub_selected and sub_selected != st.session_state.get("backup_sub_nav"):
-                st.session_state["backup_sub_nav"] = sub_selected
-                st.rerun()
-            submenu = st.session_state.get("backup_sub_nav", "Crear Backup")
-        else:
-            submenu = None
+        submenu = st.session_state.get(f"{mainmenu.lower()}_sub_nav", None)
 
     # Redirección por URL directa de parámetro ?page=carga_movil
     if st.query_params.get("page") == "carga_movil":
@@ -320,7 +256,7 @@ def app():
     elif mainmenu == "Articulos":
         if submenu == "Cargar Novedades":
             update_art()
-        elif submenu == "ABM Articulos":
+        else:
             articulos_crud()
 
     elif mainmenu == "Rubros":

@@ -427,7 +427,7 @@ def remitos_ventas():
 
             with c_btn3:
                 clear_form_clicked = st.button(
-                    "Limpiar Formulario 🔄",
+                    "Limpiar Formulario 🧹",
                     width="stretch",
                     disabled=disabled_clear
                 )
