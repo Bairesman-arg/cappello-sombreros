@@ -38,7 +38,7 @@ def whereami():
 RUTASCRIPT = whereami()
 
 def app():
-    st.components.v1.html(
+    config.render_html(
         """
         <script>
             (function() {
@@ -100,8 +100,7 @@ def app():
                 }
             })();
         </script>
-        """,
-        height=0,
+        """
     )
 
     query_page = str(st.query_params.get("page", "")).lower()

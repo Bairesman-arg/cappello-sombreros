@@ -6,7 +6,7 @@ estándar (Code128) del elemento seleccionado y crear un PDF de etiquetas,
 con una estructura de navegación en el sidebar.
 """
 import streamlit as st
-import streamlit.components.v1 as components
+import config
 import pandas as pd
 import barcode
 from barcode.writer import ImageWriter
@@ -296,7 +296,7 @@ def gen_barcode():
     if target_to_focus:
         st.session_state.focus_target_gb = ''
 
-    components.html(f"""
+    config.render_html(f"""
     <script>
         (function() {{
             const doc = window.parent.document;
@@ -439,4 +439,4 @@ def gen_barcode():
             setTimeout(executeJumpToPrecio, 1500);
         }}
     </script>
-    """, height=0, width=0)
+    """)

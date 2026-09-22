@@ -4,7 +4,6 @@ import datetime
 from datetime import datetime as dt_class
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 from sqlalchemy import text
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment

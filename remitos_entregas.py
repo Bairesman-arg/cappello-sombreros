@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from datetime import timedelta, datetime, date
 import time
@@ -626,7 +625,7 @@ def remitos_entregas():
     if target_to_focus:
         st.session_state.focus_target = ''
 
-    components.html(f"""
+    config.render_html(f"""
     <script>
         (function() {{
             try {{
@@ -941,7 +940,7 @@ def remitos_entregas():
             }}, 25);
         }}
     </script>
-    """, height=0, width=0)
+    """)
 
 if __name__ == "__main__":
     remitos_entregas()

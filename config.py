@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from openpyxl.utils import get_column_letter
 
-VERSION = "1.2.63"
+VERSION = "1.2.64"
 TITULO_APP = f"🧢 SISTEMA CAPELLO vs {VERSION}"
 # TITULO_APP = "INTRODUCCION A PYTHON"
 FOOTER_APP = "Sistema Capello® - Powered by Python and Streamlit - Telegram: @Bairesman - 2026"
@@ -29,6 +29,19 @@ def init_clientes_articulos():
         del st.session_state.articulos_df
     except:
         pass
+
+def render_html(html_code: str, height: str | int = "content", width: str | int = "stretch"):
+    """
+    Renderiza código HTML/JS usando st.iframe si está disponible (evitando advertencias de deprecación)
+    o components.html como fallback en versiones anteriores de Streamlit.
+    """
+    if hasattr(st, "iframe"):
+        st.iframe(html_code, height=height, width=width)
+    else:
+        import streamlit.components.v1 as components
+        h = 0 if height == "content" else height
+        w = 0 if width == "stretch" else width
+        components.html(html_code, height=h, width=w)
 
 def get_desktop_path() -> str:
     """Obtiene la ruta del Escritorio del usuario."""

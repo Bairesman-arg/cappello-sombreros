@@ -5,7 +5,7 @@ import config
 def remitos_ventas_resumen(remito_id, cab, df_items):
     """Muestra una vista resumen informativa y no editable del remito en su estado actual (Remito en Edición)."""
     st.markdown("<div id='resumen_top_anchor'></div>", unsafe_allow_html=True)
-    st.components.v1.html(
+    config.render_html(
         """
         <script>
             (function() {
@@ -141,7 +141,7 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
     # Botón de Cerrar Resúmen
     if st.button("Cerrar Resúmen", type="primary", width="stretch"):
         st.session_state.show_resumen_movil = False
-        st.components.v1.html(
+        config.render_html(
             """
             <script>
                 (function() {
@@ -162,7 +162,6 @@ def remitos_ventas_resumen(remito_id, cab, df_items):
                     setTimeout(scrollToTop, 100);
                 })();
             </script>
-            """,
-            height=0,
+            """
         )
         st.rerun()

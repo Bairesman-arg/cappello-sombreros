@@ -20,6 +20,11 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     cab = data["cabecera"]
     items = data["items"]
 
+    # Determinar si ya es una venta (si tiene fecha de retiro cargada o is_retiro es True)
+    f_retiro_val = cab.get("fecha_retiro")
+    tiene_fecha_retiro = bool(f_retiro_val and pd.notna(f_retiro_val) and str(f_retiro_val).strip() not in ["", "None", "nan", "NaT"])
+    es_venta = is_retiro or tiene_fecha_retiro
+
     # Cargar plantilla
     template_path = os.path.join(os.path.dirname(__file__), "DOCS", "REMITO_Master.xlsx")
     wb = load_workbook(template_path)
@@ -32,10 +37,7 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     ws["H8"] = "Nro." + f'{remito_id:05d}'
     ws["A6"] = f"{cab['direccion'] or ''} - {cab['localidad'] or ''}"
     ws["G6"] = cab["telefono"] or ""
-    if not is_retiro:  # Solo cuando se genera el Remito (1ra. vez)
-        ws["H2"] = (1.0 - (float(cab["porc_dto"]) / 100.0)) if cab.get("porc_dto") else 1.0
-    else:
-        ws["H2"] = (1.0 - (float(cab["porc_dto"]) / 100.0)) if cab.get("porc_dto") else 1.0
+    ws["H2"] = (1.0 - (float(cab["porc_dto"]) / 100.0)) if cab.get("porc_dto") else 1.0
 
     # --- Items ---
     base_row = 10
@@ -45,10 +47,29 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
         # Columna C utiliza la fórmula nativa de la plantilla Excel: =IF(D10 ="","",D10*$H$2)
         ws[f"D{base_row+i}"] = float(row["precio_real"])
         ws[f"E{base_row+i}"] = int(row["entregados"])
-        if is_retiro:
+        if es_venta:
             ws[f"F{base_row+i}"] = int(row["devueltos"])
             ws[f"G{base_row+i}"] = int(row["entregados"]-row["devueltos"])
-            ws[f"H{base_row+i}"] = row["observaciones"]
+
+    # --- Resumen agrupado por precio (Columna H) ---
+    if es_venta:
+        # Al ser una venta (con fecha de retiro o retiro), NO se graba el resumen y se limpia la columna
+        for i in range(max(len(items), 35)):
+            ws[f"H{base_row+i}"] = None
+    elif not items.empty:
+        # Solo en Entrega (1ra. vez, sin fecha de retiro)
+        items_copia = items.copy()
+        items_copia["precio_real"] = pd.to_numeric(items_copia["precio_real"], errors="coerce").fillna(0.0)
+        items_copia["entregados"] = pd.to_numeric(items_copia["entregados"], errors="coerce").fillna(0)
+        
+        resumen = items_copia.groupby("precio_real", as_index=False)["entregados"].sum()
+        resumen = resumen.sort_values(by="precio_real", ascending=False)
+        
+        for idx, r_row in resumen.reset_index(drop=True).iterrows():
+            cant = int(r_row["entregados"])
+            precio = float(r_row["precio_real"])
+            precio_str = f"{int(precio)}" if precio.is_integer() else f"{precio:.2f}"
+            ws[f"H{base_row+idx}"] = f"{cant:>2d} arts.  $ {precio_str}"
 
     # --- Fecha de entrega ---
     fecha = pd.to_datetime(cab["fecha_entrega"])
@@ -57,7 +78,7 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     ws["G45"] = fecha.year % 100
 
     # --- Fecha Retiro ---
-    if is_retiro:
+    if es_venta:
         try:
             fecha = pd.to_datetime(cab["fecha_retiro"]) #--
             ws["E46"] = fecha.day

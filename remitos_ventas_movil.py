@@ -201,7 +201,7 @@ def remitos_ventas_movil():
 
     # Si NO hay remito cargado (o recién se abre/reinicia), enfocar y seleccionar automáticamente el texto del input
     if not remito_cargado:
-        st.components.v1.html(
+        config.render_html(
             """
             <script>
                 (function() {
@@ -219,8 +219,7 @@ def remitos_ventas_movil():
                     setTimeout(focusRemitoInput, 200);
                 })();
             </script>
-            """,
-            height=0,
+            """
         )
 
     # Botones en la misma línea: "Seleccionar Otro Remito" y "Ver Resúmen" en la cabecera
@@ -233,7 +232,7 @@ def remitos_ventas_movil():
         with col_btn_top2:
             if st.button("Ver Resúmen", key="btn_resumen_top_movil", width="stretch"):
                 st.session_state.show_resumen_movil = True
-                st.components.v1.html(
+                config.render_html(
                     """
                     <script>
                         (function() {
@@ -254,8 +253,7 @@ def remitos_ventas_movil():
                             setTimeout(scrollToTop, 100);
                         })();
                     </script>
-                    """,
-                    height=0,
+                    """
                 )
                 st.rerun()
 
@@ -584,7 +582,7 @@ def remitos_ventas_movil():
 
             if st.button("Ver Resúmen del Remito", width="stretch"):
                 st.session_state.show_resumen_movil = True
-                st.components.v1.html(
+                config.render_html(
                     """
                     <script>
                         (function() {
@@ -605,8 +603,7 @@ def remitos_ventas_movil():
                             setTimeout(scrollToTop, 100);
                         })();
                     </script>
-                    """,
-                    height=0,
+                    """
                 )
                 st.rerun()
 

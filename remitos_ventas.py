@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import config
 import pandas as pd
 from datetime import date, datetime
 from models import get_remito_completo, update_remito_data, get_clients_and_articles
@@ -931,7 +931,7 @@ def remitos_ventas():
             setTimeout(focusRemitoInput, 350);
         """
 
-    components.html(f"""
+    config.render_html(f"""
     <script>
         (function() {{
             try {{
@@ -1280,7 +1280,7 @@ def remitos_ventas():
             }}, 25);
         }}
     </script>
-    """, height=0, width=0)
+    """)
 
 if __name__ == "__main__":
     remitos_ventas()

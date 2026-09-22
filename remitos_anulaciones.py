@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 from datetime import date, datetime
 from models import get_remito_completo, delete_remito
@@ -266,7 +265,7 @@ def remitos_anulaciones():
     st.markdown(f"`{config.FOOTER_APP}`")
 
     if "remito_activo_anul" not in st.session_state:
-        components.html("""
+        config.render_html("""
         <script>
             (function() {
                 function focusRemitoInput() {
@@ -296,7 +295,7 @@ def remitos_anulaciones():
                 setTimeout(focusRemitoInput, 350);
             })();
         </script>
-        """, height=0, width=0)
+        """)
 
 if __name__ == "__main__":
     remitos_anulaciones()
