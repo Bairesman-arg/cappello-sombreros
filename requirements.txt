@@ -7,5 +7,6 @@ reportlab
 sqlalchemy
 setuptools
 psycopg2-binary
+psycopg[binary]
 numpy
 altair
