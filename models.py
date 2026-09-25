@@ -10,8 +10,19 @@ from datetime import datetime
 # Producción: desde variables de configuración en la web
 DB_URL = st.secrets["DB_URL"]
 
+# Configuración de conexión compatible con Supabase / PgBouncer Transaction Pooler
+connect_args = {}
+try:
+    import psycopg
+    connect_args["prepare_threshold"] = None
+except ImportError:
+    pass
+
 # Crear motor SQLAlchemy
-engine = create_engine(DB_URL, pool_pre_ping=True)
+try:
+    engine = create_engine(DB_URL, pool_pre_ping=True, connect_args=connect_args)
+except Exception:
+    engine = create_engine(DB_URL, pool_pre_ping=True)
 
 def init_db():
     with engine.begin() as conn:

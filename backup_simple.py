@@ -192,7 +192,17 @@ def check_database_status(db_url):
     try:
         from sqlalchemy import create_engine, text
         
-        engine = create_engine(db_url, pool_pre_ping=True)
+        connect_args = {}
+        try:
+            import psycopg
+            connect_args["prepare_threshold"] = None
+        except ImportError:
+            pass
+
+        try:
+            engine = create_engine(db_url, pool_pre_ping=True, connect_args=connect_args)
+        except Exception:
+            engine = create_engine(db_url, pool_pre_ping=True)
         
         with st.spinner("Consultando base de datos..."):
             with engine.begin() as conn:
@@ -375,7 +385,17 @@ def create_backup(db_url):
         status.text("🔄 Conectando a PostgreSQL...")
         progress.progress(10)
         
-        engine = create_engine(db_url, pool_pre_ping=True)
+        connect_args = {}
+        try:
+            import psycopg
+            connect_args["prepare_threshold"] = None
+        except ImportError:
+            pass
+
+        try:
+            engine = create_engine(db_url, pool_pre_ping=True, connect_args=connect_args)
+        except Exception:
+            engine = create_engine(db_url, pool_pre_ping=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Crear directorio temporal

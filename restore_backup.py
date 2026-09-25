@@ -177,9 +177,17 @@ def restore_database(uploaded_file, db_url, restore_option):
         progress.progress(30)
         
         # Paso 3: Conectar a la base de datos
-        status.text("🔌 Conectando a PostgreSQL...")
+        connect_args = {}
+        try:
+            import psycopg
+            connect_args["prepare_threshold"] = None
+        except ImportError:
+            pass
         
-        engine = create_engine(db_url, pool_pre_ping=True)
+        try:
+            engine = create_engine(db_url, pool_pre_ping=True, connect_args=connect_args)
+        except Exception:
+            engine = create_engine(db_url, pool_pre_ping=True)
         
         st.success("✅ Conexión establecida")
         progress.progress(40)
