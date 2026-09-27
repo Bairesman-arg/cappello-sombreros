@@ -17,6 +17,9 @@ def clear_item_inputs():
     st.session_state.precio_real_input = 0.0
     st.session_state.precio_original_articulo = 0.0
     st.session_state.articulo_selectbox_fixed = None
+    st.session_state.pop("pending_selected_item_ent", None)
+    st.session_state.pop("pending_articulo_selectbox_fixed", None)
+    st.session_state.ent_grid_version = st.session_state.get("ent_grid_version", 0) + 1
 
 def new_remito():
     """Reinicia completamente el formulario para un nuevo remito."""
@@ -38,6 +41,10 @@ def new_remito():
     st.session_state.cliente_selected_display = None
     # Limpiar artículo precargado pero mantener clave del selectbox
     st.session_state.articulo_precargado = None
+    for k in list(st.session_state.keys()):
+        if k.startswith("ent_base_df_") or k.startswith("editor_ent_"):
+            st.session_state.pop(k, None)
+    st.session_state.ent_grid_version = 0
     clear_item_inputs()
 
 def calculate_consignacion(items_df):
@@ -105,7 +112,8 @@ def remitos_entregas():
         "precios_actualizados": False,
         "articulo_precargado": None,
         "precio_original_articulo": 0.0,
-        "focus_articulo": False
+        "focus_articulo": False,
+        "ent_grid_version": 0
     }
 
     for key, default in default_values.items():
@@ -213,6 +221,7 @@ def remitos_entregas():
     st.session_state.cabecera_data['observaciones'] = observaciones_cabecera
 
     # === SECCIÓN ITEMS ===
+    st.markdown('<div id="seccion_carga_items_ent" style="scroll-margin-top: 80px;"></div>', unsafe_allow_html=True)
     st.header("Carga de Items")
 
     st.markdown(
@@ -237,6 +246,16 @@ def remitos_entregas():
     if st.session_state.cabecera_data.get('cliente_id') and st.session_state.cliente_selected_display:
         razon_social = st.session_state.cliente_selected_display.split("  |  Boca:")[0].strip()
         articulo_label = f"Artículos para {razon_social}:"
+
+    if "pending_selected_item_ent" in st.session_state:
+        pending = st.session_state.pop("pending_selected_item_ent")
+        if pending:
+            st.session_state.articulo_selectbox_fixed = pending.get("articulo_selectbox_fixed")
+            st.session_state.entregados_input = pending.get("entregados_input", 1)
+            st.session_state.precio_real_input = pending.get("precio_real_input", 0.0)
+            st.session_state.precio_original_articulo = pending.get("precio_real_input", 0.0)
+            st.session_state.observaciones_item_input = pending.get("observaciones_item_input", "")
+            st.session_state.articulo_precargado = pending.get("articulo_precargado")
 
     if "pending_articulo_selectbox_fixed" in st.session_state:
         pending_val = st.session_state.pop("pending_articulo_selectbox_fixed")
@@ -331,7 +350,7 @@ def remitos_entregas():
     articulo_existe = (articulo_sel is not None and
                       articulo_sel in st.session_state.items_data['Articulo'].values)
 
-    c1, c2, c3 = st.columns(3, gap="small")
+    c1, c2, c3, c4 = st.columns(4, gap="small")
 
     with c1:
         add_clicked = st.button(
@@ -357,8 +376,21 @@ def remitos_entregas():
                      st.session_state.is_form_disabled)
         )
 
+    with c4:
+        clear_form_clicked = st.button(
+            "Limpiar Formulario 🧹",
+            width="stretch",
+            disabled=(st.session_state.is_form_disabled or
+                     (articulo_sel is None and not st.session_state.observaciones_item_input and st.session_state.precio_real_input <= 0))
+        )
+
+    if clear_form_clicked:
+        st.session_state.should_clear_items = True
+        st.session_state.ent_grid_version = st.session_state.get("ent_grid_version", 0) + 1
+        st.rerun()
+
     if articulo_existe:
-        st.success("Artículo existente en el nuevo Remito. Solo puede ser Modificado o Eliminado")
+        st.success("Artículo existente en el nuevo Remito. Solo puede ser Modificado o Eliminado, o cancele la operación Limpiando el Formulario.")
 
     porc_dto_val = float(st.session_state.get('porc_dto', 0) or 0)
 
@@ -393,6 +425,7 @@ def remitos_entregas():
                 )
 
             st.session_state.should_clear_items = True
+            st.session_state.ent_grid_version = st.session_state.get("ent_grid_version", 0) + 1
             st.rerun()
 
     if mod_clicked and articulo_existe:
@@ -419,6 +452,7 @@ def remitos_entregas():
             }
             st.success("Artículo modificado")
             st.session_state.should_clear_items = True
+            st.session_state.ent_grid_version = st.session_state.get("ent_grid_version", 0) + 1
             st.rerun()
 
     if del_clicked and articulo_existe:
@@ -427,29 +461,88 @@ def remitos_entregas():
         ].reset_index(drop=True)
         st.warning("Artículo eliminado")
         st.session_state.should_clear_items = True
+        st.session_state.ent_grid_version = st.session_state.get("ent_grid_version", 0) + 1
         st.rerun()
 
     # === MOSTRAR ITEMS ACTUALES ===
     st.header("Items actuales del Remito")
 
     if not st.session_state.items_data.empty:
-        num_items_ent = len(st.session_state.items_data)
+        grid_ver = st.session_state.get("ent_grid_version", 0)
+        editor_key = f"editor_ent_{grid_ver}"
+        base_df_key = f"ent_base_df_{grid_ver}"
+
+        if base_df_key not in st.session_state:
+            df_init = st.session_state.items_data.copy().reset_index(drop=True)
+            if "Seleccionado" not in df_init.columns:
+                df_init.insert(0, "Seleccionado", False)
+            st.session_state[base_df_key] = df_init
+
+        df_to_show = st.session_state[base_df_key]
+
+        st.markdown("`Seleccione la primera columna de la grilla inferior para modificar o eliminar un ítem.`")
+
+        num_items_ent = len(df_to_show)
         rows_to_show_ent = min(max(num_items_ent, 1), 10)
         grid_height_ent = int(39 + (rows_to_show_ent * 35.5) + 4)
-        # Se muestra el dataframe sin edición
-        st.dataframe(
-            st.session_state.items_data[['Articulo', 'Descripción', 'Precio Real', 'Entregados', 'Observaciones']],
+
+        disabled_cols = ["Articulo", "Descripción", "Precio Real", "Entregados", "Observaciones"]
+        if st.session_state.is_form_disabled:
+            disabled_cols.append("Seleccionado")
+
+        edited_df = st.data_editor(
+            df_to_show,
             hide_index=True,
             width="stretch",
             height=grid_height_ent,
+            column_order=["Seleccionado", "Articulo", "Descripción", "Precio Real", "Entregados", "Observaciones"],
             column_config={
-                "Articulo": st.column_config.Column(width="medium"),
-                "Descripción": st.column_config.Column(width="medium"),
-                "Precio Real": st.column_config.NumberColumn(format="$%,.2f", width="small"),
-                "Entregados": st.column_config.Column(width="small"),
-                "Observaciones": st.column_config.Column(width="small")
-            }
+                "Seleccionado": st.column_config.CheckboxColumn(
+                    "✔",
+                    help="Marque la casilla de verificación para modificar o eliminar este artículo.",
+                    width=40
+                ),
+                "Articulo": st.column_config.TextColumn("Artículo", disabled=True, width="medium"),
+                "Descripción": st.column_config.TextColumn("Descripción", disabled=True, width="medium"),
+                "Precio Real": st.column_config.NumberColumn(
+                    "Precio Real",
+                    format="$%.2f",
+                    disabled=True,
+                    width="small"
+                ),
+                "Entregados": st.column_config.NumberColumn(
+                    "Entregados",
+                    disabled=True,
+                    width="small"
+                ),
+                "Observaciones": st.column_config.TextColumn("Observaciones", disabled=True, width="small"),
+            },
+            disabled=disabled_cols,
+            key=editor_key,
+            num_rows="fixed"
         )
+
+        if "Seleccionado" in edited_df.columns:
+            selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
+            if selected_idxs:
+                idx = selected_idxs[0]
+                selected_row = edited_df.loc[idx]
+                nro_art = str(selected_row["Articulo"])
+
+                matching_opts = [opt for opt in articulo_options_full if opt.startswith(f"{nro_art} - ")]
+                sel_option = matching_opts[0] if matching_opts else None
+
+                st.session_state.pending_selected_item_ent = {
+                    "articulo_selectbox_fixed": sel_option,
+                    "entregados_input": int(selected_row["Entregados"]),
+                    "precio_real_input": float(selected_row["Precio Real"]),
+                    "observaciones_item_input": str(selected_row["Observaciones"]) if pd.notna(selected_row["Observaciones"]) else "",
+                    "articulo_precargado": nro_art
+                }
+                st.session_state.ent_grid_version = grid_ver + 1
+                st.session_state.scroll_to_carga_ent = True
+                st.session_state.focus_target = "entregados"
+                st.rerun()
     else:
         st.info("Sin items cargados todavía.")
 
@@ -625,9 +718,14 @@ def remitos_entregas():
     if target_to_focus:
         st.session_state.focus_target = ''
 
+    scroll_to_carga = st.session_state.pop('scroll_to_carga_ent', False)
+    exec_nonce = time.time_ns()
+
     config.render_html(f"""
+    <!-- exec_nonce: {exec_nonce} -->
     <script>
         (function() {{
+            const _execNonce = "{exec_nonce}";
             try {{
                 const doc = window.parent.document;
                 const pWin = window.parent;
@@ -759,6 +857,16 @@ def remitos_entregas():
                     try {{ targetOpt.click(); }} catch(e) {{}}
                 }}
 
+                // Función para obtener el botón de acción activo (Agregar Item o Modificar Item)
+                function getActionButton() {{
+                    const buttons = Array.from(doc.querySelectorAll('button'));
+                    const addBtn = buttons.find(b => (b.textContent || '').includes('Agregar Item') && !b.disabled);
+                    if (addBtn) return addBtn;
+                    const modBtn = buttons.find(b => (b.textContent || '').includes('Modificar Item') && !b.disabled);
+                    if (modBtn) return modBtn;
+                    return null;
+                }}
+
                 // Secuencia exacta del formulario de items para Enter
                 function getFormSequence() {{
                     const sequence = [];
@@ -779,18 +887,8 @@ def remitos_entregas():
                         if (input && !input.disabled) sequence.push({{ container: entWidget, input: input }});
                     }}
                     
-                    // 3. Precio Real
-                    const precWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Precio Real'));
-                    if (precWidget) {{
-                        const input = precWidget.querySelector('input');
-                        if (input && !input.disabled) sequence.push({{ container: precWidget, input: input }});
-                    }}
-                    
-                    // 4. Botón Agregar Item o Modificar Item (salto directo desde Precio Real)
-                    const buttons = Array.from(doc.querySelectorAll('button'));
-                    const actionBtn = buttons.find(b => 
-                        ((b.textContent || '').includes('Agregar Item') || (b.textContent || '').includes('Modificar Item')) && !b.disabled
-                    );
+                    // 3. Botón de acción: Agregar Item o Modificar Item (salto directo desde Entregados)
+                    const actionBtn = getActionButton();
                     if (actionBtn) sequence.push({{ container: actionBtn, input: actionBtn, isButton: true }});
                     
                     return sequence;
@@ -852,9 +950,27 @@ def remitos_entregas():
                             }}
                         }}
 
-                        // Para los demás campos, Enter salta al siguiente
+                        // Para los demás campos, Enter salta al siguiente o al botón de acción
                         if (e.key === 'Enter' || e.keyCode === 13) {{
                             if (activeEl.tagName === 'BUTTON') return;
+
+                            // Si el usuario está en Precio Real u Observaciones, también pasar al botón de acción
+                            const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                            const precWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Precio Real'));
+                            const textInputs = Array.from(doc.querySelectorAll('div[data-testid="stTextInput"]'));
+                            const obsWidget = textInputs.find(w => (w.innerText || w.textContent || '').includes('Observaciones del Item'));
+
+                            if ((precWidget && (precWidget === activeEl || precWidget.contains(activeEl))) ||
+                                (obsWidget && (obsWidget === activeEl || obsWidget.contains(activeEl)))) {{
+                                const actionBtn = getActionButton();
+                                if (actionBtn) {{
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    actionBtn.focus();
+                                    return;
+                                }}
+                            }}
+
                             const sequence = getFormSequence();
                             const currIdx = sequence.findIndex(item => item.input === activeEl || item.container.contains(activeEl));
                             if (currIdx > -1 && currIdx < sequence.length - 1) {{
@@ -877,7 +993,7 @@ def remitos_entregas():
         const targetType = '{target_to_focus}';
         if (targetType === 'entregados') {{
             let attempts = 0;
-            const maxAttempts = 40;
+            const maxAttempts = 30;
             const interval = setInterval(function() {{
                 attempts++;
                 try {{
@@ -891,7 +1007,7 @@ def remitos_entregas():
                                 if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
                                     try {{ doc.activeElement.blur(); }} catch(e) {{}}
                                 }}
-                                input.focus();
+                                try {{ input.focus({{ preventScroll: true }}); }} catch(e_f) {{ input.focus(); }}
                                 try {{
                                     input.select();
                                     input.setSelectionRange(0, input.value.length);
@@ -912,7 +1028,7 @@ def remitos_entregas():
             }}, 25);
         }} else if (targetType === 'articulo') {{
             let attempts = 0;
-            const maxAttempts = 40;
+            const maxAttempts = 30;
             const interval = setInterval(function() {{
                 attempts++;
                 try {{
@@ -926,7 +1042,7 @@ def remitos_entregas():
                                 if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
                                     try {{ doc.activeElement.blur(); }} catch(e) {{}}
                                 }}
-                                input.focus();
+                                try {{ input.focus({{ preventScroll: true }}); }} catch(e_f) {{ input.focus(); }}
                                 try {{ input.select(); }} catch(e) {{}}
                             }} else {{
                                 if (attempts > 5) clearInterval(interval);
@@ -938,6 +1054,82 @@ def remitos_entregas():
                 }}
                 if (attempts >= maxAttempts) clearInterval(interval);
             }}, 25);
+        }}
+
+        // Salto a 'Carga de Items' cuando se marca un artículo en la primera columna
+        function scrollToCargaEnt() {{
+            try {{
+                const doc = window.parent.document;
+                const pWin = window.parent;
+                if (!doc) return;
+
+                // 1. Buscar prioritariamente el encabezado visible "Carga de Items"
+                const headings = Array.from(doc.querySelectorAll('h1, h2, h3, [data-testid="stHeadingWithActionElements"]'));
+                let targetEl = headings.find(h => (h.innerText || h.textContent || '').trim().includes('Carga de Items'));
+                if (!targetEl) {{
+                    targetEl = doc.getElementById('seccion_carga_items_ent');
+                }}
+                if (!targetEl) {{
+                    const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
+                    if (selectboxes.length > 0) targetEl = selectboxes[selectboxes.length - 1];
+                }}
+
+                if (targetEl) {{
+                    // Usar scrollIntoView nativo
+                    try {{
+                        targetEl.scrollIntoView({{ behavior: 'smooth', block: 'start', inline: 'nearest' }});
+                    }} catch(e) {{}}
+
+                    // Scrollear todos los contenedores de Streamlit que posean scroll activo
+                    const containers = [
+                        doc.querySelector('div[data-testid="stAppViewContainer"]'),
+                        doc.querySelector('section[data-testid="stMain"]'),
+                        doc.querySelector('section.main'),
+                        doc.querySelector('.main'),
+                        doc.documentElement,
+                        doc.body
+                    ].filter(Boolean);
+
+                    containers.forEach(function(container) {{
+                        try {{
+                            if (container.scrollHeight > container.clientHeight) {{
+                                const cRect = (container === doc.documentElement || container === doc.body)
+                                    ? {{ top: 0 }}
+                                    : container.getBoundingClientRect();
+                                const elRect = targetEl.getBoundingClientRect();
+                                const targetScroll = container.scrollTop + (elRect.top - cRect.top) - 15;
+                                try {{
+                                    container.scrollTo({{ top: Math.max(0, targetScroll), behavior: 'smooth' }});
+                                }} catch(err) {{
+                                    container.scrollTop = Math.max(0, targetScroll);
+                                }}
+                            }}
+                        }} catch(err2) {{}}
+                    }});
+
+                    // Scroll global en la ventana
+                    try {{
+                        const elRectGlobal = targetEl.getBoundingClientRect();
+                        const pageY = pWin.pageYOffset || doc.documentElement.scrollTop || doc.body.scrollTop || 0;
+                        const globalScrollTop = pageY + elRectGlobal.top - 15;
+                        if (globalScrollTop > 0) {{
+                            pWin.scrollTo({{ top: Math.max(0, globalScrollTop), behavior: 'smooth' }});
+                            doc.documentElement.scrollTop = Math.max(0, globalScrollTop);
+                            doc.body.scrollTop = Math.max(0, globalScrollTop);
+                        }}
+                    }} catch(err3) {{}}
+                }}
+            }} catch(e) {{}}
+        }}
+
+        const shouldScrollToCarga = {'true' if scroll_to_carga else 'false'};
+        if (shouldScrollToCarga) {{
+            scrollToCargaEnt();
+            setTimeout(scrollToCargaEnt, 30);
+            setTimeout(scrollToCargaEnt, 80);
+            setTimeout(scrollToCargaEnt, 160);
+            setTimeout(scrollToCargaEnt, 320);
+            setTimeout(scrollToCargaEnt, 600);
         }}
     </script>
     """)

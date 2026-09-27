@@ -421,7 +421,7 @@ def remitos_ventas_movil():
                     st.session_state[f"recepcion_el_dia_saved_{remito_id}"] = bool(st.session_state.get(f"recepcion_el_dia_{remito_id}"))
 
                 st.checkbox(
-                    "Recepción en el Día",
+                    "Recepción en el día | Modificaciones pre-ventas",
                     key=f"recepcion_el_dia_{remito_id}",
                     on_change=update_rec_dia_saved,
                     disabled=st.session_state.is_form_disabled_movil
@@ -536,7 +536,7 @@ def remitos_ventas_movil():
                 f_entrega = cab.get("fecha_entrega")
                 if nueva_fecha_retiro is None:
                     fecha_retiro_error = True
-                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro antes de actualizar el Remito o, marcar la casilla de 'Recepción en el Día'.")
+                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro antes de actualizar el Remito o, marcar la casilla de 'Recepción en el Día | Modificaciones pre-ventas'.")
                 elif f_entrega and nueva_fecha_retiro < f_entrega:
                     fecha_retiro_error = True
                     st.warning("⚠️ La Fecha de Retiro no puede ser anterior a la Fecha de Entrega.")

@@ -12,18 +12,18 @@ def clear_item_inputs_rec(set_focus=False, remito_id=None):
     st.session_state.precio_real_input_rec = 0.0
     st.session_state.articulo_selectbox_rec = None
     st.session_state.pop("pending_selected_item_rec", None)
+    st.session_state.pop("pending_articulo_selectbox_rec_val", None)
     if remito_id is not None:
-        st.session_state[f"view_items_grid_{remito_id}"] = True
-        st.session_state[f"item_selected_from_grid_{remito_id}"] = False
         st.session_state[f"rec_grid_version_{remito_id}"] = st.session_state.get(f"rec_grid_version_{remito_id}", 0) + 1
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"rec_base_df_{remito_id}_") or k.startswith(f"editor_{remito_id}_"):
+                st.session_state.pop(k, None)
     else:
         for k in list(st.session_state.keys()):
-            if k.startswith("view_items_grid_"):
-                st.session_state[k] = True
-            elif k.startswith("item_selected_from_grid_"):
-                st.session_state[k] = False
-            elif k.startswith("rec_grid_version_"):
+            if k.startswith("rec_grid_version_"):
                 st.session_state[k] = st.session_state[k] + 1
+            elif k.startswith("rec_base_df_") or k.startswith("editor_"):
+                st.session_state.pop(k, None)
     if set_focus:
         st.session_state.focus_target = "articulo"
     else:
@@ -121,7 +121,7 @@ def remitos_ventas():
     st.session_state.is_form_disabled = st.session_state.show_confirm_modal or st.session_state.excel_saved
 
     # --- Entrada de número de remito ---
-    col1, col2, _ = st.columns([1.5, 1.5, 2], gap="small", vertical_alignment="bottom")
+    col1, col2 = st.columns([1.5, 3.5], gap="small", vertical_alignment="bottom")
 
     # Función para cargar remito automáticamente
     def cargar_remito_auto():
@@ -176,7 +176,7 @@ def remitos_ventas():
         if "remito_activo_rec" in st.session_state and st.session_state["remito_activo_rec"] is not None:
             active_id = st.session_state["remito_activo_rec"]
             st.checkbox(
-                "Recepción en el Día",
+                "Recepción en el día | Modificaciones pre-ventas",
                 key=f"recepcion_el_dia_{active_id}",
                 disabled=st.session_state.is_form_disabled
             )
@@ -276,9 +276,9 @@ def remitos_ventas():
                     disabled=st.session_state.is_form_disabled
                 )
 
-            # === SECCIÓN CARGA Y ELIMINACIÓN DE ITEMS ===
+            # === SECCIÓN CARGA DE ITEMS ===
             st.markdown('<div id="seccion_carga_items_rec" style="scroll-margin-top: 80px;"></div>', unsafe_allow_html=True)
-            st.header("Carga y Eliminación de Items")
+            st.header("Carga de Items")
 
             st.markdown(
                 """
@@ -316,29 +316,24 @@ def remitos_ventas():
             if articulo_sel_pre and items_key in st.session_state and not st.session_state[items_key].empty:
                 is_existing_item = articulo_sel_pre in st.session_state[items_key]['nro_articulo'].values
 
-            show_grid = view_grilla_items and not is_existing_item
-            is_selectbox_disabled = st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items
-            is_item_input_disabled = is_selectbox_disabled or is_existing_item
+            is_selectbox_disabled = st.session_state.is_form_disabled
+            is_item_input_disabled = st.session_state.is_form_disabled
 
-            default_art_index = None
-            if st.session_state.get("articulo_selectbox_rec") in articulo_options_full:
-                default_art_index = articulo_options_full.index(st.session_state["articulo_selectbox_rec"])
-
+            # Selectbox de artículos
             articulo_sel_full = st.selectbox(
                 f"Artículos para {cab['razon_social']}:",
                 options=articulo_options_full,
-                index=default_art_index,
+                index=None,
                 placeholder="Seleccione un artículo...",
                 key="articulo_selectbox_rec",
                 disabled=is_selectbox_disabled,
-                help="Seleccione un nuevo artículo o uno existente para agregar o eliminar."
+                help="Seleccione un nuevo artículo o uno existente en la grilla para modificar o eliminar."
             )
 
             articulo_sel = None
-            if articulo_sel_full:
+            if articulo_sel_full and not st.session_state.is_form_disabled:
                 articulo_sel = articulo_sel_full.split(" - ")[0]
 
-            if articulo_sel_full and not (st.session_state.is_form_disabled or item_selected_from_grid or not view_grilla_items):
                 should_preload = (
                     'articulo_precargado_rec' not in st.session_state or
                     st.session_state.articulo_precargado_rec != articulo_sel or
@@ -391,15 +386,18 @@ def remitos_ventas():
                     disabled=is_item_input_disabled
                 )
 
-            # Botones de acción ("Agregar Item ➕", "Eliminar Item 🗑️" y "Limpiar Formulario 🔄")
-            c_btn1, c_btn2, c_btn3 = st.columns(3, gap="small")
+            # Botones de acción ("Agregar Item ➕", "Modificar Item ✍️", "Eliminar Item 🗑️" y "Limpiar Formulario 🧹")
+            c_btn1, c_btn2, c_btn3, c_btn4 = st.columns(4, gap="small")
 
             disabled_add = (
                 articulo_sel is None or 
                 st.session_state.is_form_disabled or 
-                item_selected_from_grid or 
-                not view_grilla_items or 
                 is_existing_item
+            )
+            disabled_mod = (
+                articulo_sel is None or 
+                st.session_state.is_form_disabled or 
+                not is_existing_item
             )
             disabled_del = (
                 articulo_sel is None or 
@@ -408,7 +406,7 @@ def remitos_ventas():
             )
             disabled_clear = (
                 st.session_state.is_form_disabled or 
-                (view_grilla_items and articulo_sel is None and not item_selected_from_grid)
+                (articulo_sel is None and st.session_state.entregados_input_rec == 1 and st.session_state.precio_real_input_rec <= 0 and not st.session_state.observaciones_item_input_rec)
             )
 
             with c_btn1:
@@ -419,13 +417,20 @@ def remitos_ventas():
                 )
 
             with c_btn2:
+                mod_clicked = st.button(
+                    "Modificar Item ✍️",
+                    width="stretch",
+                    disabled=disabled_mod
+                )
+
+            with c_btn3:
                 del_clicked = st.button(
                     "Eliminar Item 🗑️",
                     width="stretch",
                     disabled=disabled_del
                 )
 
-            with c_btn3:
+            with c_btn4:
                 clear_form_clicked = st.button(
                     "Limpiar Formulario 🧹",
                     width="stretch",
@@ -456,7 +461,7 @@ def remitos_ventas():
                         costo_val = float(articulo_info['costo']) if ('costo' in articulo_info and pd.notna(articulo_info['costo'])) else 0.0
                         porc_dto_val = float(cab.get("porc_dto", 0) or 0)
                         precio_neto_input = st.session_state.precio_real_input_rec * (1.0 - (porc_dto_val / 100.0))
-                        if precio_neto_input < costo_val:
+                        if precio_neto_input < costo_val and costo_val > 0:
                             st.session_state.item_rec_message = ("error", f"⚠️ El Precio Real (\${st.session_state.precio_real_input_rec:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${precio_neto_input:,.2f} vs Costo: \${costo_val:,.2f}).")
                             st.rerun()
 
@@ -477,6 +482,44 @@ def remitos_ventas():
                         grid_ver_key = f"rec_grid_version_{remito_id}"
                         st.session_state[grid_ver_key] = st.session_state.get(grid_ver_key, 0) + 1
                         st.rerun()
+
+            if mod_clicked and is_existing_item:
+                matching = st.session_state.articulos_df.loc[st.session_state.articulos_df['nro_articulo'] == articulo_sel]
+                costo_val = 0.0
+                if not matching.empty:
+                    articulo_info = matching.iloc[0]
+                    costo_val = float(articulo_info['costo']) if ('costo' in articulo_info and pd.notna(articulo_info['costo'])) else 0.0
+
+                porc_dto_val = float(cab.get("porc_dto", 0) or 0)
+                precio_neto_input = st.session_state.precio_real_input_rec * (1.0 - (porc_dto_val / 100.0))
+
+                if st.session_state.entregados_input_rec < 1:
+                    st.session_state.item_rec_message = ("error", "⚠️ La cantidad entregada debe ser 1 o mayor.")
+                    st.rerun()
+                elif st.session_state.precio_real_input_rec <= 0:
+                    st.session_state.item_rec_message = ("error", "⚠️ El precio real debe ser mayor a cero.")
+                    st.rerun()
+                elif precio_neto_input < costo_val and costo_val > 0:
+                    st.session_state.item_rec_message = ("error", f"⚠️ El Precio Real (\${st.session_state.precio_real_input_rec:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${precio_neto_input:,.2f} vs Costo: \${costo_val:,.2f}).")
+                    st.rerun()
+                else:
+                    idx = st.session_state[items_key].index[st.session_state[items_key]['nro_articulo'] == articulo_sel][0]
+                    dev_actual = int(st.session_state[items_key].loc[idx, 'devueltos']) if 'devueltos' in st.session_state[items_key].columns else 0
+                    if dev_actual > st.session_state.entregados_input_rec:
+                        st.session_state.item_rec_message = ("warning", f"⚠️ La cantidad entregada ({st.session_state.entregados_input_rec}) no puede ser menor a los devueltos registrados ({dev_actual}).")
+                        st.rerun()
+
+                    st.session_state[items_key].loc[idx, 'precio_real'] = float(st.session_state.precio_real_input_rec)
+                    st.session_state[items_key].loc[idx, 'entregados'] = int(st.session_state.entregados_input_rec)
+                    st.session_state[items_key].loc[idx, 'observaciones'] = str(st.session_state.observaciones_item_input_rec)
+
+                    st.session_state.remito_saved = False
+                    st.session_state.item_rec_message = ("success", "Artículo modificado")
+                    st.session_state.should_clear_items_rec = True
+                    st.session_state.remito_id_to_clear_rec = remito_id
+                    grid_ver_key = f"rec_grid_version_{remito_id}"
+                    st.session_state[grid_ver_key] = st.session_state.get(grid_ver_key, 0) + 1
+                    st.rerun()
 
             if del_clicked:
                 if items_key in st.session_state and (st.session_state[items_key].empty or articulo_sel not in st.session_state[items_key]['nro_articulo'].values):
@@ -506,7 +549,7 @@ def remitos_ventas():
                     st.success(msg_text)
                 del st.session_state.item_rec_message
             elif is_existing_item:
-                st.success("Artículo existente en el Remito. Solo puede ser Eliminado o cancele la operación Limpiando el Formulario.")
+                st.success("Artículo existente en el Remito. Solo puede ser Modificado o Eliminado, o cancele la operación Limpiando el Formulario.")
 
             grid_ver_key = f"rec_grid_version_{remito_id}"
             grid_ver = st.session_state.get(grid_ver_key, 0)
@@ -523,64 +566,68 @@ def remitos_ventas():
 
             df_to_show = st.session_state[base_df_key]
 
-            if show_grid:
-                st.subheader(f"Items del Remito #{remito_id}")
-                st.markdown("`Seleccione la primera columna de la grilla inferior para eliminar. Para modificar celda: ENTER -> modificar ->ENTER`")
+            # === GRILLA DE ITEMS (SIEMPRE VISIBLE) ===
+            st.header("Items actuales del Remito")
+            st.markdown("`Seleccione la primera columna de la grilla inferior para modificar o eliminar un ítem. Para editar en grilla: ENTER -> modificar -> ENTER`")
 
-                col_edit, col_calc = st.columns([4, 1], gap="small")
-                
-                num_items_rec = len(df_to_show)
-                rows_to_show = max(num_items_rec, 1)
-                grid_height = int(39 + (rows_to_show * 35.5) + 4)
+            col_edit, col_calc = st.columns([4, 1], gap="small")
+            
+            num_items_rec = len(df_to_show)
+            rows_to_show = max(num_items_rec, 1)
+            grid_height = int(39 + (rows_to_show * 35.5) + 4)
 
-                with col_edit:
-                    st.markdown("#### Editar Devoluciones y Observaciones")
+            with col_edit:
+                st.markdown("#### Editar Devoluciones y Observaciones")
 
+                if st.session_state.is_form_disabled:
+                    disabled_cols = [c for c in df_to_show.columns]
+                elif is_existing_item:
+                    disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
+                else:
                     disabled_cols = ["nro_articulo", "descripcion"]
-                    if st.session_state.is_form_disabled:
-                        disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"] + ["Seleccionado"]
 
-                    edited_df = st.data_editor(
-                        df_to_show,
-                        hide_index=True,
-                        width="stretch",
-                        height=grid_height,
-                        column_order=["Seleccionado", "nro_articulo", "descripcion", "precio_real", "entregados", "devueltos", "observaciones"],
-                        column_config={
-                            "Seleccionado": st.column_config.CheckboxColumn(
-                                "✔",
-                                help="Marque la casilla de verificación para eliminar este artículo.",
-                                width=40
-                            ),
-                            "nro_articulo": st.column_config.TextColumn("Artículo", disabled=True, width="small"),
-                            "descripcion": st.column_config.TextColumn("Descripción", disabled=True, width="medium"),
-                            "precio_real": st.column_config.NumberColumn(
-                                "Precio Real",
-                                min_value=0.01,
-                                step=100.0,
-                                format="$%.2f",
-                                width="small"
-                            ),
-                            "entregados": st.column_config.NumberColumn(
-                                "Entregados",
-                                min_value=1,
-                                step=1,
-                                width="small"
-                            ),
-                            "devueltos": st.column_config.NumberColumn(
-                                "devueltos", 
-                                min_value=0,
-                                step=1,
-                                width="small"
-                            ),
-                            "observaciones": st.column_config.TextColumn("observaciones", width="medium"),
-                        },
-                        disabled=disabled_cols,
-                        key=editor_key,
-                        num_rows="fixed"
-                    )
+                edited_df = st.data_editor(
+                    df_to_show,
+                    hide_index=True,
+                    width="stretch",
+                    height=grid_height,
+                    column_order=["Seleccionado", "nro_articulo", "descripcion", "precio_real", "entregados", "devueltos", "observaciones"],
+                    column_config={
+                        "Seleccionado": st.column_config.CheckboxColumn(
+                            "✔",
+                            help="Marque la casilla de verificación para modificar o eliminar este artículo.",
+                            width=40
+                        ),
+                        "nro_articulo": st.column_config.TextColumn("Artículo", disabled=True, width="small"),
+                        "descripcion": st.column_config.TextColumn("Descripción", disabled=True, width="medium"),
+                        "precio_real": st.column_config.NumberColumn(
+                            "Precio Real",
+                            min_value=0.01,
+                            step=100.0,
+                            format="$%.2f",
+                            width="small"
+                        ),
+                        "entregados": st.column_config.NumberColumn(
+                            "Entregados",
+                            min_value=1,
+                            step=1,
+                            width="small"
+                        ),
+                        "devueltos": st.column_config.NumberColumn(
+                            "devueltos", 
+                            min_value=0,
+                            step=1,
+                            width="small"
+                        ),
+                        "observaciones": st.column_config.TextColumn("observaciones", width="medium"),
+                    },
+                    disabled=disabled_cols,
+                    key=editor_key,
+                    num_rows="fixed"
+                )
 
-                # Sincronizar inmediatamente los cambios hacia items_key para Vendidos y Totales
+            # Sincronizar inmediatamente los cambios hacia items_key cuando no está en modo modificación por form
+            if not is_existing_item and not st.session_state.is_form_disabled:
                 cols_to_sync = [c for c in edited_df.columns if c != "Seleccionado" and c in st.session_state[items_key].columns]
                 for col in cols_to_sync:
                     st.session_state[items_key][col] = edited_df[col].values
@@ -594,55 +641,52 @@ def remitos_ventas():
                                 if col_name != "Seleccionado" and col_name in st.session_state[items_key].columns:
                                     st.session_state[items_key].loc[row_idx, col_name] = new_val
 
-                df_editado = st.session_state[items_key].copy()
+            df_editado = st.session_state[items_key].copy()
 
-                with col_calc:
-                    st.markdown("#### Vendidos")
-                    if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
-                        devueltos_clean = pd.to_numeric(df_editado["devueltos"], errors="coerce").fillna(0).astype(int)
-                        entregados_clean = pd.to_numeric(df_editado["entregados"], errors="coerce").fillna(0).astype(int)
-                        vendidos_valores = (entregados_clean - devueltos_clean).clip(lower=0)
+            with col_calc:
+                st.markdown("#### Vendidos")
+                if "devueltos" in df_editado.columns and "entregados" in df_editado.columns:
+                    devueltos_clean = pd.to_numeric(df_editado["devueltos"], errors="coerce").fillna(0).astype(int)
+                    entregados_clean = pd.to_numeric(df_editado["entregados"], errors="coerce").fillna(0).astype(int)
+                    vendidos_valores = (entregados_clean - devueltos_clean).clip(lower=0)
 
-                        vendidos_df = pd.DataFrame({"Vendidos": vendidos_valores})
-                        
-                        st.dataframe(
-                            vendidos_df,
-                            hide_index=True,
-                            width="stretch",
-                            height=grid_height,
-                            column_config={
-                                "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
-                            }
-                        )
-                    else:
-                        st.info("Datos no disponibles")
-
-                if "Seleccionado" in edited_df.columns:
-                    selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
-                    if selected_idxs:
-                        idx = selected_idxs[0]
-                        selected_row = edited_df.loc[idx]
-                        nro_art = selected_row["nro_articulo"]
-
-                        matching_opts = [opt for opt in articulo_options_full if opt.startswith(f"{nro_art} - ")]
-                        sel_option = matching_opts[0] if matching_opts else None
-
-                        st.session_state.pending_selected_item_rec = {
-                            "articulo_selectbox_rec": sel_option,
-                            "entregados_input_rec": int(selected_row["entregados"]),
-                            "precio_real_input_rec": float(selected_row["precio_real"]),
-                            "observaciones_item_input_rec": str(selected_row["observaciones"]) if pd.notna(selected_row["observaciones"]) else "",
-                            "articulo_precargado_rec": nro_art
+                    vendidos_df = pd.DataFrame({"Vendidos": vendidos_valores})
+                    
+                    st.dataframe(
+                        vendidos_df,
+                        hide_index=True,
+                        width="stretch",
+                        height=grid_height,
+                        column_config={
+                            "Vendidos": st.column_config.NumberColumn("Vendidos", width="small")
                         }
+                    )
+                else:
+                    st.info("Datos no disponibles")
 
-                        st.session_state[selected_from_grid_key] = True
-                        st.session_state[view_grid_key] = False
-                        st.session_state[grid_ver_key] = grid_ver + 1
-                        st.session_state.scroll_to_carga_rec = True
-                        st.rerun()
+            if "Seleccionado" in edited_df.columns:
+                selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
+                if selected_idxs:
+                    idx = selected_idxs[0]
+                    selected_row = edited_df.loc[idx]
+                    nro_art = str(selected_row["nro_articulo"])
 
-            else:
-                df_editado = st.session_state[items_key].copy() if items_key in st.session_state else pd.DataFrame()
+                    matching_opts = [opt for opt in articulo_options_full if opt.startswith(f"{nro_art} - ")]
+                    sel_option = matching_opts[0] if matching_opts else None
+
+                    st.session_state.pending_selected_item_rec = {
+                        "articulo_selectbox_rec": sel_option,
+                        "entregados_input_rec": int(selected_row["entregados"]),
+                        "precio_real_input_rec": float(selected_row["precio_real"]),
+                        "observaciones_item_input_rec": str(selected_row["observaciones"]) if pd.notna(selected_row["observaciones"]) else "",
+                        "articulo_precargado_rec": nro_art
+                    }
+
+                    grid_ver_key = f"rec_grid_version_{remito_id}"
+                    st.session_state[grid_ver_key] = grid_ver + 1
+                    st.session_state.scroll_to_carga_rec = True
+                    st.session_state.focus_target = "entregados"
+                    st.rerun()
 
             # --- Totales y Utilidades (inmediatamente a continuación de las grillas) ---
             total_entregados = 0
@@ -760,7 +804,7 @@ def remitos_ventas():
             else:
                 if nueva_fecha_retiro is None:
                     fecha_retiro_error = True
-                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro antes de actualizar el Remito o, marcar la casilla de 'Recepción en el Día'.")
+                    st.warning("⚠️ Debe seleccionar una Fecha de Retiro antes de actualizar el Remito o, marcar la casilla de 'Recepción en el Día | Modificaciones pre-ventas'.")
                 elif f_entrega and nueva_fecha_retiro < f_entrega:
                     fecha_retiro_error = True
                     f_ent_str = f_entrega.strftime("%d/%m/%Y") if hasattr(f_entrega, "strftime") else str(f_entrega)
@@ -910,6 +954,7 @@ def remitos_ventas():
         st.session_state.focus_target = ''
 
     scroll_to_carga = st.session_state.pop('scroll_to_carga_rec', False)
+    exec_nonce = time.time_ns()
 
     is_remito_activo = "remito_activo_rec" in st.session_state and st.session_state["remito_activo_rec"] is not None
     focus_script = ""
@@ -932,8 +977,10 @@ def remitos_ventas():
         """
 
     config.render_html(f"""
+    <!-- exec_nonce: {exec_nonce} -->
     <script>
         (function() {{
+            const _execNonce = "{exec_nonce}";
             try {{
                 const doc = window.parent.document;
                 const pWin = window.parent;
@@ -1069,6 +1116,18 @@ def remitos_ventas():
                     try {{ targetOpt.click(); }} catch(e) {{}}
                 }}
 
+                // Función para obtener el botón de acción activo (Agregar Item, Modificar Item o Eliminar Item)
+                function getActionButton() {{
+                    const buttons = Array.from(doc.querySelectorAll('button'));
+                    const addBtn = buttons.find(b => (b.textContent || '').includes('Agregar Item') && !b.disabled);
+                    if (addBtn) return addBtn;
+                    const modBtn = buttons.find(b => (b.textContent || '').includes('Modificar Item') && !b.disabled);
+                    if (modBtn) return modBtn;
+                    const delBtn = buttons.find(b => (b.textContent || '').includes('Eliminar Item') && !b.disabled);
+                    if (delBtn) return delBtn;
+                    return null;
+                }}
+
                 // Secuencia exacta del formulario de items para Enter
                 function getFormSequence() {{
                     const sequence = [];
@@ -1089,18 +1148,8 @@ def remitos_ventas():
                         if (input && !input.disabled) sequence.push({{ container: entWidget, input: input }});
                     }}
                     
-                    // 3. Precio Real
-                    const precWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Precio Real'));
-                    if (precWidget) {{
-                        const input = precWidget.querySelector('input');
-                        if (input && !input.disabled) sequence.push({{ container: precWidget, input: input }});
-                    }}
-                    
-                    // 4. Botón Agregar Item o Modificar Item (salto directo desde Precio Real)
-                    const buttons = Array.from(doc.querySelectorAll('button'));
-                    const actionBtn = buttons.find(b => 
-                        ((b.textContent || '').includes('Agregar Item') || (b.textContent || '').includes('Modificar Item')) && !b.disabled
-                    );
+                    // 3. Botón de acción: Agregar Item o Modificar Item (salto directo desde Entregados)
+                    const actionBtn = getActionButton();
                     if (actionBtn) sequence.push({{ container: actionBtn, input: actionBtn, isButton: true }});
                     
                     return sequence;
@@ -1124,7 +1173,7 @@ def remitos_ventas():
                                     if (input) {{
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        input.focus();
+                                        try {{ input.focus({{ preventScroll: true }}); }} catch(err) {{ input.focus(); }}
                                         doSelect(input);
                                         return;
                                     }}
@@ -1152,7 +1201,7 @@ def remitos_ventas():
                                         if (input) {{
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            input.focus();
+                                            try {{ input.focus({{ preventScroll: true }}); }} catch(err) {{ input.focus(); }}
                                             doSelect(input);
                                             return;
                                         }}
@@ -1162,16 +1211,34 @@ def remitos_ventas():
                             }}
                         }}
 
-                        // Para los demás campos, Enter salta al siguiente
+                        // Para los demás campos, Enter salta al siguiente o al botón de acción
                         if (e.key === 'Enter' || e.keyCode === 13) {{
                             if (activeEl.tagName === 'BUTTON') return;
+
+                            // Si el usuario está en Precio Real u Observaciones, también pasar al botón de acción
+                            const numInputs = Array.from(doc.querySelectorAll('div[data-testid="stNumberInput"]'));
+                            const precWidget = numInputs.find(w => (w.innerText || w.textContent || '').includes('Precio Real'));
+                            const textInputs = Array.from(doc.querySelectorAll('div[data-testid="stTextInput"]'));
+                            const obsWidget = textInputs.find(w => (w.innerText || w.textContent || '').includes('Observaciones del Item'));
+
+                            if ((precWidget && (precWidget === activeEl || precWidget.contains(activeEl))) ||
+                                (obsWidget && (obsWidget === activeEl || obsWidget.contains(activeEl)))) {{
+                                const actionBtn = getActionButton();
+                                if (actionBtn) {{
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    try {{ actionBtn.focus({{ preventScroll: true }}); }} catch(err) {{ actionBtn.focus(); }}
+                                    return;
+                                }}
+                            }}
+
                             const sequence = getFormSequence();
                             const currIdx = sequence.findIndex(item => item.input === activeEl || item.container.contains(activeEl));
                             if (currIdx > -1 && currIdx < sequence.length - 1) {{
                                 e.preventDefault();
                                 e.stopPropagation();
                                 const nextItem = sequence[currIdx + 1];
-                                nextItem.input.focus();
+                                try {{ nextItem.input.focus({{ preventScroll: true }}); }} catch(err) {{ nextItem.input.focus(); }}
                                 if (!nextItem.isButton) {{
                                     doSelect(nextItem.input);
                                 }}
@@ -1189,7 +1256,7 @@ def remitos_ventas():
         const targetType = '{target_to_focus}';
         if (targetType === 'entregados') {{
             let attempts = 0;
-            const maxAttempts = 40;
+            const maxAttempts = 30;
             const interval = setInterval(function() {{
                 attempts++;
                 try {{
@@ -1203,7 +1270,7 @@ def remitos_ventas():
                                 if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
                                     try {{ doc.activeElement.blur(); }} catch(e) {{}}
                                 }}
-                                input.focus();
+                                try {{ input.focus({{ preventScroll: true }}); }} catch(e_f) {{ input.focus(); }}
                                 try {{
                                     input.select();
                                     input.setSelectionRange(0, input.value.length);
@@ -1224,7 +1291,7 @@ def remitos_ventas():
             }}, 25);
         }} else if (targetType === 'articulo') {{
             let attempts = 0;
-            const maxAttempts = 40;
+            const maxAttempts = 30;
             const interval = setInterval(function() {{
                 attempts++;
                 try {{
@@ -1238,7 +1305,7 @@ def remitos_ventas():
                                 if (doc.activeElement && typeof doc.activeElement.blur === 'function') {{
                                     try {{ doc.activeElement.blur(); }} catch(e) {{}}
                                 }}
-                                input.focus();
+                                try {{ input.focus({{ preventScroll: true }}); }} catch(e_f) {{ input.focus(); }}
                                 try {{ input.select(); }} catch(e) {{}}
                             }} else {{
                                 if (attempts > 5) clearInterval(interval);
@@ -1252,32 +1319,80 @@ def remitos_ventas():
             }}, 25);
         }}
 
-        // Salto a 'Carga y Eliminación de Items' cuando se marca un artículo en la primera columna
+        // Salto a 'Carga de Items' cuando se marca un artículo en la primera columna
+        function scrollToCargaRec() {{
+            try {{
+                const doc = window.parent.document;
+                const pWin = window.parent;
+                if (!doc) return;
+
+                // 1. Buscar prioritariamente el encabezado visible "Carga de Items"
+                const headings = Array.from(doc.querySelectorAll('h1, h2, h3, [data-testid="stHeadingWithActionElements"]'));
+                let targetEl = headings.find(h => (h.innerText || h.textContent || '').trim().includes('Carga de Items'));
+                if (!targetEl) {{
+                    targetEl = doc.getElementById('seccion_carga_items_rec');
+                }}
+                if (!targetEl) {{
+                    const selectboxes = doc.querySelectorAll('div[data-testid="stSelectbox"]');
+                    if (selectboxes.length > 0) targetEl = selectboxes[selectboxes.length - 1];
+                }}
+
+                if (targetEl) {{
+                    // Usar scrollIntoView nativo
+                    try {{
+                        targetEl.scrollIntoView({{ behavior: 'smooth', block: 'start', inline: 'nearest' }});
+                    }} catch(e) {{}}
+
+                    // Scrollear todos los contenedores de Streamlit que posean scroll activo
+                    const containers = [
+                        doc.querySelector('div[data-testid="stAppViewContainer"]'),
+                        doc.querySelector('section[data-testid="stMain"]'),
+                        doc.querySelector('section.main'),
+                        doc.querySelector('.main'),
+                        doc.documentElement,
+                        doc.body
+                    ].filter(Boolean);
+
+                    containers.forEach(function(container) {{
+                        try {{
+                            if (container.scrollHeight > container.clientHeight) {{
+                                const cRect = (container === doc.documentElement || container === doc.body)
+                                    ? {{ top: 0 }}
+                                    : container.getBoundingClientRect();
+                                const elRect = targetEl.getBoundingClientRect();
+                                const targetScroll = container.scrollTop + (elRect.top - cRect.top) - 15;
+                                try {{
+                                    container.scrollTo({{ top: Math.max(0, targetScroll), behavior: 'smooth' }});
+                                }} catch(err) {{
+                                    container.scrollTop = Math.max(0, targetScroll);
+                                }}
+                            }}
+                        }} catch(err2) {{}}
+                    }});
+
+                    // Scroll global en la ventana
+                    try {{
+                        const elRectGlobal = targetEl.getBoundingClientRect();
+                        const pageY = pWin.pageYOffset || doc.documentElement.scrollTop || doc.body.scrollTop || 0;
+                        const globalScrollTop = pageY + elRectGlobal.top - 15;
+                        if (globalScrollTop > 0) {{
+                            pWin.scrollTo({{ top: Math.max(0, globalScrollTop), behavior: 'smooth' }});
+                            doc.documentElement.scrollTop = Math.max(0, globalScrollTop);
+                            doc.body.scrollTop = Math.max(0, globalScrollTop);
+                        }}
+                    }} catch(err3) {{}}
+                }}
+            }} catch(e) {{}}
+        }}
+
         const shouldScrollToCarga = {'true' if scroll_to_carga else 'false'};
         if (shouldScrollToCarga) {{
-            let scrollAttempts = 0;
-            const maxScrollAttempts = 30;
-            const scrollInterval = setInterval(function() {{
-                scrollAttempts++;
-                try {{
-                    const doc = window.parent.document;
-                    const el = doc.getElementById('seccion_carga_items_rec') ||
-                               Array.from(doc.querySelectorAll('h2, h3, h1, [data-testid="stHeadingWithActionElements"]'))
-                                    .find(h => (h.innerText || h.textContent || '').includes('Carga y Eliminación de Items'));
-                    if (el) {{
-                        el.scrollIntoView({{ behavior: 'auto', block: 'start' }});
-                        const mainContainer = doc.querySelector('.main, section.main, div[data-testid="stAppViewContainer"]');
-                        if (mainContainer) {{
-                            const rect = el.getBoundingClientRect();
-                            mainContainer.scrollTop = mainContainer.scrollTop + rect.top - 70;
-                        }}
-                        if (scrollAttempts > 5) clearInterval(scrollInterval);
-                    }}
-                }} catch(e) {{
-                    if (scrollAttempts >= maxScrollAttempts) clearInterval(scrollInterval);
-                }}
-                if (scrollAttempts >= maxScrollAttempts) clearInterval(scrollInterval);
-            }}, 25);
+            scrollToCargaRec();
+            setTimeout(scrollToCargaRec, 30);
+            setTimeout(scrollToCargaRec, 80);
+            setTimeout(scrollToCargaRec, 160);
+            setTimeout(scrollToCargaRec, 320);
+            setTimeout(scrollToCargaRec, 600);
         }}
     </script>
     """)
