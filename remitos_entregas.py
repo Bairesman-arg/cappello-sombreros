@@ -20,6 +20,9 @@ def clear_item_inputs():
     st.session_state.pop("pending_selected_item_ent", None)
     st.session_state.pop("pending_articulo_selectbox_fixed", None)
     st.session_state.ent_grid_version = st.session_state.get("ent_grid_version", 0) + 1
+    for k in list(st.session_state.keys()):
+        if k.startswith("ent_base_df_") or k.startswith("editor_ent_"):
+            st.session_state.pop(k, None)
 
 def new_remito():
     """Reinicia completamente el formulario para un nuevo remito."""
@@ -49,8 +52,8 @@ def new_remito():
 
 def calculate_consignacion(items_df):
     """Calcula el total de items entregados."""
-    if 'Entregados' in items_df.columns:
-        return int(items_df['Entregados'].sum())
+    if 'Entregados' in items_df.columns and not items_df.empty:
+        return int(pd.to_numeric(items_df['Entregados'], errors='coerce').fillna(0).sum())
     return 0
 
 def calculate_total_facturar(items_df, cliente_id, porc_dto):
@@ -480,15 +483,18 @@ def remitos_entregas():
 
         df_to_show = st.session_state[base_df_key]
 
-        st.markdown("`Seleccione la primera columna de la grilla inferior para modificar o eliminar un ítem.`")
+        st.markdown("`Seleccione la primera columna de la grilla inferior para modificar o eliminar un ítem. Para editar en grilla: ENTER -> modificar -> ENTER`")
 
         num_items_ent = len(df_to_show)
         rows_to_show_ent = min(max(num_items_ent, 1), 10)
         grid_height_ent = int(39 + (rows_to_show_ent * 35.5) + 4)
 
-        disabled_cols = ["Articulo", "Descripción", "Precio Real", "Entregados", "Observaciones"]
         if st.session_state.is_form_disabled:
-            disabled_cols.append("Seleccionado")
+            disabled_cols = [c for c in df_to_show.columns]
+        elif articulo_existe:
+            disabled_cols = [c for c in df_to_show.columns if c != "Seleccionado"]
+        else:
+            disabled_cols = ["Articulo", "Descripción"]
 
         edited_df = st.data_editor(
             df_to_show,
@@ -506,21 +512,38 @@ def remitos_entregas():
                 "Descripción": st.column_config.TextColumn("Descripción", disabled=True, width="medium"),
                 "Precio Real": st.column_config.NumberColumn(
                     "Precio Real",
+                    min_value=0.01,
+                    step=100.0,
                     format="$%.2f",
-                    disabled=True,
                     width="small"
                 ),
                 "Entregados": st.column_config.NumberColumn(
                     "Entregados",
-                    disabled=True,
+                    min_value=1,
+                    step=1,
                     width="small"
                 ),
-                "Observaciones": st.column_config.TextColumn("Observaciones", disabled=True, width="small"),
+                "Observaciones": st.column_config.TextColumn("Observaciones", width="medium"),
             },
             disabled=disabled_cols,
             key=editor_key,
             num_rows="fixed"
         )
+
+        # Sincronizar inmediatamente los cambios hacia items_data cuando no está en modo modificación por form
+        if not articulo_existe and not st.session_state.is_form_disabled:
+            cols_to_sync = [c for c in edited_df.columns if c != "Seleccionado" and c in st.session_state.items_data.columns]
+            for col in cols_to_sync:
+                st.session_state.items_data[col] = edited_df[col].values
+
+            if editor_key in st.session_state:
+                editor_changes = st.session_state[editor_key]
+                if isinstance(editor_changes, dict) and 'edited_rows' in editor_changes:
+                    for row_idx_str, changes in editor_changes['edited_rows'].items():
+                        row_idx = int(row_idx_str)
+                        for col_name, new_val in changes.items():
+                            if col_name != "Seleccionado" and col_name in st.session_state.items_data.columns:
+                                st.session_state.items_data.loc[row_idx, col_name] = new_val
 
         if "Seleccionado" in edited_df.columns:
             selected_idxs = edited_df.index[edited_df["Seleccionado"] == True].tolist()
@@ -571,27 +594,53 @@ def remitos_entregas():
     # === BOTONES PRINCIPALES ===
     st.header("Acciones del Remito")
 
-    # Verificar si hay algún ítem con precio real que no deje utilidad
+    # VALIDAR grilla
+    items_precio_invalidos = pd.DataFrame()
+    items_entregados_invalidos = pd.DataFrame()
+    items_precio_menor_costo = []
     has_item_price_error = False
-    if not st.session_state.items_data.empty and 'articulos_df' in st.session_state:
-        porc_dto_val = float(st.session_state.get('porc_dto', 0) or 0)
-        for _, row in st.session_state.items_data.iterrows():
-            art_num = row['Articulo']
-            p_real = float(row['Precio Real'])
-            p_neto = p_real * (1.0 - (porc_dto_val / 100.0))
-            matching_art = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == art_num]
-            if not matching_art.empty:
-                costo_val = float(matching_art.iloc[0]['costo']) if ('costo' in matching_art.iloc[0] and pd.notna(matching_art.iloc[0]['costo'])) else 0.0
-                if p_neto < costo_val and costo_val > 0:
-                    has_item_price_error = True
-                    break
 
-    if has_item_price_error:
-        st.error("⚠️ No se puede guardar el remito: contiene artículos cuyo Precio Real no deja utilidad (queda por debajo del Costo con el descuento aplicado).")
+    if not st.session_state.items_data.empty:
+        try:
+            if "Precio Real" in st.session_state.items_data.columns:
+                p_real_ser = pd.to_numeric(st.session_state.items_data["Precio Real"], errors="coerce").fillna(0)
+                items_precio_invalidos = st.session_state.items_data[p_real_ser <= 0]
+                if not items_precio_invalidos.empty:
+                    arts = items_precio_invalidos["Articulo"].tolist()
+                    st.warning(f"⚠️ Los artículos [{', '.join(str(x) for x in arts)}] tienen un Precio Real inválido (debe ser mayor a 0). Corregir antes de guardar.")
+
+            if "Entregados" in st.session_state.items_data.columns:
+                ent_ser = pd.to_numeric(st.session_state.items_data["Entregados"], errors="coerce").fillna(0)
+                items_entregados_invalidos = st.session_state.items_data[ent_ser <= 0]
+                if not items_entregados_invalidos.empty:
+                    arts = items_entregados_invalidos["Articulo"].tolist()
+                    st.warning(f"⚠️ Los artículos [{', '.join(str(x) for x in arts)}] tienen una cantidad Entregados inválida (debe ser 1 o mayor). Corregir antes de guardar.")
+
+            if "articulos_df" in st.session_state and "Precio Real" in st.session_state.items_data.columns:
+                porc_dto_val = float(st.session_state.get('porc_dto', 0) or 0)
+                for _, row in st.session_state.items_data.iterrows():
+                    art_num = row['Articulo']
+                    p_real = float(row['Precio Real']) if pd.notna(row['Precio Real']) else 0.0
+                    p_neto = p_real * (1.0 - (porc_dto_val / 100.0))
+                    matching_art = st.session_state.articulos_df[st.session_state.articulos_df['nro_articulo'] == art_num]
+                    if not matching_art.empty:
+                        costo_val = float(matching_art.iloc[0]['costo']) if ('costo' in matching_art.iloc[0] and pd.notna(matching_art.iloc[0]['costo'])) else 0.0
+                        if p_neto < costo_val and costo_val > 0:
+                            items_precio_menor_costo.append(art_num)
+                if items_precio_menor_costo:
+                    has_item_price_error = True
+                    if porc_dto_val > 0:
+                        st.warning(f"⚠️ Los artículos [{', '.join(str(x) for x in items_precio_menor_costo)}] tienen un Precio Real que no deja utilidad con el descuento del {porc_dto_val:.0f}% (queda por debajo del Costo). Corregir antes de guardar.")
+                    else:
+                        st.warning(f"⚠️ Los artículos [{', '.join(str(x) for x in items_precio_menor_costo)}] tienen un Precio Real que no deja utilidad (es menor a su Costo). Corregir antes de guardar.")
+        except Exception as e:
+            st.error(f"Error en validación: {str(e)}")
 
     is_remito_saved = st.session_state.remito_id is not None
     can_save = (st.session_state.cabecera_data['cliente_id'] is not None and
                 not st.session_state.items_data.empty and
+                items_precio_invalidos.empty and
+                items_entregados_invalidos.empty and
                 not has_item_price_error)
 
     col_buttons = st.columns(3, gap="small")
