@@ -71,15 +71,15 @@ def obtener_advertencias_precios():
     sugerido = costo * 3.0
     if abs(precio_pub - sugerido) > 0.01:
         if precio_pub > sugerido:
-            warnings.append(f"⚠️ Aviso: El 'Precio al Público' (\${precio_pub:,.2f}) es MAYOR al Costo x 3 (\${sugerido:,.2f}).")
+            warnings.append(f"⚠️ Aviso: El 'Precio al Público' (${precio_pub:,.2f}) es MAYOR al Costo x 3 (${sugerido:,.2f}).")
         else:
-            warnings.append(f"⚠️ Aviso: El 'Precio al Público' (\${precio_pub:,.2f}) es MENOR al Costo x 3 (\${sugerido:,.2f}).")
+            warnings.append(f"⚠️ Aviso: El 'Precio al Público' (${precio_pub:,.2f}) es MENOR al Costo x 3 (${sugerido:,.2f}).")
 
     # 2. Cuando el Precio Real es menor al Precio al Publico * 0.9 (tolerancia del 10%)
     tolerancia_10 = precio_pub * 0.9
     if precio_real < tolerancia_10 - 0.01:
         pct_dto = (1.0 - (precio_real / precio_pub)) * 100.0 if precio_pub > 0 else 0
-        warnings.append(f"⚠️ Aviso: El 'Precio Real al Público' (\${precio_real:,.2f}) es inferior al 'Precio al Público' (\${precio_pub:,.2f}). Es un descuento del {pct_dto:.1f}% que supera la tolerancia del 10%.")
+        warnings.append(f"⚠️ Aviso: El 'Precio Real al Público' (${precio_real:,.2f}) es inferior al 'Precio al Público' (${precio_pub:,.2f}). Es un descuento del {pct_dto:.1f}% que supera la tolerancia del 10%.")
 
     return warnings
 

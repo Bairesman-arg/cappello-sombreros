@@ -405,7 +405,7 @@ def remitos_entregas():
         elif st.session_state.precio_real_input <= 0:
             st.error("El precio real debe ser mayor a cero. Vuelva a seleccionar el artículo.")
         elif p_neto < costo_val:
-            st.error(f"⚠️ El Precio Real (\${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${p_neto:,.2f} vs Costo: \${costo_val:,.2f}).")
+            st.error(f"⚠️ El Precio Real (${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${p_neto:,.2f} vs Costo: ${costo_val:,.2f}).")
         else:
             new_item = {
                 'Articulo': articulo_sel,
@@ -436,7 +436,7 @@ def remitos_entregas():
         if st.session_state.entregados_input < 1:
             st.error("La cantidad entregada debe ser 1 o mayor.")
         elif p_neto < costo_val:
-            st.error(f"⚠️ El Precio Real (\${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: \${p_neto:,.2f} vs Costo: \${costo_val:,.2f}).")
+            st.error(f"⚠️ El Precio Real (${st.session_state.precio_real_input:,.2f}) no deja utilidad con el descuento del {porc_dto_val:.0f}% (Neto: ${p_neto:,.2f} vs Costo: ${costo_val:,.2f}).")
         else:
             idx = st.session_state.items_data.index[
                 st.session_state.items_data['Articulo'] == articulo_sel
