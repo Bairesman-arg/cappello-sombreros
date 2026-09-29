@@ -44,7 +44,7 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
     for i, row in items.iterrows():
         ws[f"A{base_row+i}"] = row["nro_articulo"]
         ws[f"B{base_row+i}"] = row["descripcion"]
-        # Columna C utiliza la fórmula nativa de la plantilla Excel: =IF(D10 ="","",D10*$H$2)
+        ws[f"C{base_row+i}"] = f'=IF(D{base_row+i} ="","",D{base_row+i}*$H$2)'
         ws[f"D{base_row+i}"] = float(row["precio_real"])
         ws[f"E{base_row+i}"] = int(row["entregados"])
         if es_venta:
@@ -73,17 +73,17 @@ def gen_remito(remito_id: int, is_retiro=False) -> io.BytesIO:
 
     # --- Fecha de entrega ---
     fecha = pd.to_datetime(cab["fecha_entrega"])
-    ws["E45"] = fecha.day
-    ws["F45"] = fecha.month
-    ws["G45"] = fecha.year % 100
+    ws["E49"] = fecha.day
+    ws["F49"] = fecha.month
+    ws["G49"] = fecha.year % 100
 
     # --- Fecha Retiro ---
     if es_venta:
         try:
             fecha = pd.to_datetime(cab["fecha_retiro"]) #--
-            ws["E46"] = fecha.day
-            ws["F46"] = fecha.month
-            ws["G46"] = fecha.year % 100
+            ws["E50"] = fecha.day
+            ws["F50"] = fecha.month
+            ws["G50"] = fecha.year % 100
         except:
             pass
 
