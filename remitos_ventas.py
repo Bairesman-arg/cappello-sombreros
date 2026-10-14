@@ -1008,25 +1008,33 @@ def remitos_ventas():
                 if (pWin._keyHandlerRec) {{
                     doc.removeEventListener('keydown', pWin._keyHandlerRec, true);
                 }}
+                if (pWin._keydownClearAutoSelectRec) {{
+                    doc.removeEventListener('keydown', pWin._keydownClearAutoSelectRec, true);
+                }}
+                if (pWin._focusoutClearAutoSelectRec) {{
+                    doc.removeEventListener('focusout', pWin._focusoutClearAutoSelectRec, true);
+                }}
 
-                // Autoselección de texto al enfocar
+                // Autoselección de texto al enfocar (excluye selectbox de búsqueda)
                 pWin._selectHandlerRec = function(e) {{
                     const target = e.target;
                     if (!target) return;
                     const tag = (target.tagName || '').toUpperCase();
                     if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
                     if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'button' || target.type === 'submit') return;
+                    // No auto-seleccionar inputs dentro de selectboxes (búsqueda de cliente/artículo)
+                    if (target.closest && target.closest('div[data-testid="stSelectbox"]')) return;
 
                     if (target.dataset.autoSelecting === 'true') return;
                     target.dataset.autoSelecting = 'true';
 
                     function runPasses() {{
                         doSelect(target);
-                        setTimeout(function() {{ doSelect(target); }}, 10);
-                        setTimeout(function() {{ doSelect(target); }}, 50);
-                        setTimeout(function() {{ doSelect(target); }}, 150);
-                        setTimeout(function() {{ doSelect(target); }}, 300);
-                        requestAnimationFrame(function() {{ doSelect(target); }});
+                        setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 10);
+                        setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 50);
+                        setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 150);
+                        setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 300);
+                        requestAnimationFrame(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }});
                     }}
                     runPasses();
                 }};
@@ -1034,6 +1042,8 @@ def remitos_ventas():
                 pWin._selectionChangeHandlerRec = function() {{
                     const active = doc.activeElement;
                     if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {{
+                        // No interferir con selectboxes de búsqueda
+                        if (active.closest && active.closest('div[data-testid="stSelectbox"]')) return;
                         if (active.dataset.autoSelecting === 'true') {{
                             if (active.selectionStart !== 0 || active.selectionEnd !== active.value.length) {{
                                 doSelect(active);
@@ -1046,13 +1056,15 @@ def remitos_ventas():
                 doc.addEventListener('click', pWin._selectHandlerRec, true);
                 doc.addEventListener('selectionchange', pWin._selectionChangeHandlerRec, true);
 
-                doc.addEventListener('keydown', function(e) {{
+                // Handlers con nombre para limpieza correcta en cada rerun
+                pWin._keydownClearAutoSelectRec = function(e) {{
                     if (e.target && e.target.dataset) delete e.target.dataset.autoSelecting;
-                }}, true);
-
-                doc.addEventListener('focusout', function(e) {{
+                }};
+                pWin._focusoutClearAutoSelectRec = function(e) {{
                     if (e.target && e.target.dataset) delete e.target.dataset.autoSelecting;
-                }}, true);
+                }};
+                doc.addEventListener('keydown', pWin._keydownClearAutoSelectRec, true);
+                doc.addEventListener('focusout', pWin._focusoutClearAutoSelectRec, true);
 
                 // Función para seleccionar la primera opción o la opción activa en BaseWeb Select
                 function triggerOptionClick(targetOpt) {{
