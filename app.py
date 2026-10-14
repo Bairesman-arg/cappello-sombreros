@@ -54,8 +54,27 @@ def app():
                     window.parent.location.search = searchParams.toString();
                 }
 
+                function isSelectboxInput(el) {
+                    if (!el) return false;
+                    try {
+                        if (el.getAttribute && (
+                            el.getAttribute('role') === 'combobox' ||
+                            el.getAttribute('aria-autocomplete') === 'list' ||
+                            el.getAttribute('aria-haspopup') === 'listbox'
+                        )) return true;
+                        if (el.closest && (
+                            el.closest('div[data-testid="stSelectbox"]') ||
+                            el.closest('[data-testid="stSelectbox"]') ||
+                            el.closest('div[data-baseweb="select"]') ||
+                            el.closest('[data-baseweb="select"]') ||
+                            el.closest('.stSelectbox')
+                        )) return true;
+                    } catch(e) {}
+                    return false;
+                }
+
                 function selectAll(el) {
-                    if (!el) return;
+                    if (!el || isSelectboxInput(el)) return;
                     try {
                         if (el.type === 'number') {
                             el.type = 'text';
@@ -78,16 +97,19 @@ def app():
                 function attachAutoSelect() {
                     const inputs = parentDoc.querySelectorAll('input[type="text"], input[type="number"]');
                     inputs.forEach(input => {
+                        if (isSelectboxInput(input)) return;
                         if (!input.dataset.autoSelectAttached) {
                             input.dataset.autoSelectAttached = "true";
                             const handler = function() {
                                 const el = this;
+                                if (isSelectboxInput(el)) return;
                                 setTimeout(() => selectAll(el), 30);
                             };
                             input.addEventListener('focus', handler);
                             input.addEventListener('click', handler);
                             input.addEventListener('mousedown', function() {
                                 const el = this;
+                                if (isSelectboxInput(el)) return;
                                 setTimeout(() => selectAll(el), 50);
                             });
                         }

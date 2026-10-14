@@ -989,24 +989,61 @@ def remitos_ventas():
                     doc.documentElement.lang = 'es';
                 }}
 
-                // Función auxiliar para seleccionar todo el texto de un input
+                // Función para verificar si un elemento es o pertenece a un selectbox/combobox
+                function isSelectboxInput(el) {{
+                    if (!el) return false;
+                    try {{
+                        if (el.getAttribute && (
+                            el.getAttribute('role') === 'combobox' ||
+                            el.getAttribute('aria-autocomplete') === 'list' ||
+                            el.getAttribute('aria-haspopup') === 'listbox'
+                        )) return true;
+                        if (el.closest && (
+                            el.closest('div[data-testid="stSelectbox"]') ||
+                            el.closest('[data-testid="stSelectbox"]') ||
+                            el.closest('div[data-baseweb="select"]') ||
+                            el.closest('[data-baseweb="select"]') ||
+                            el.closest('.stSelectbox')
+                        )) return true;
+                    }} catch(e) {{}}
+                    return false;
+                }}
+
+                // Función auxiliar para seleccionar todo el texto de un input (excluye selectboxes)
                 function doSelect(el) {{
                     if (!el || doc.activeElement !== el) return;
+                    if (isSelectboxInput(el)) return;
                     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'button' || el.type === 'submit') return;
                     try {{ if (typeof el.select === 'function') el.select(); }} catch(e) {{}}
                     try {{ if (typeof el.setSelectionRange === 'function' && el.value !== undefined) el.setSelectionRange(0, el.value.length); }} catch(e) {{}}
                 }}
 
-                // Limpieza de escuchadores previos
+                // Limpieza de escuchadores previos (propios y cruzados de otras páginas)
+                if (pWin._selectHandlerEntregas) {{
+                    doc.removeEventListener('focusin', pWin._selectHandlerEntregas, true);
+                    doc.removeEventListener('click', pWin._selectHandlerEntregas, true);
+                }}
                 if (pWin._selectHandlerRec) {{
                     doc.removeEventListener('focusin', pWin._selectHandlerRec, true);
                     doc.removeEventListener('click', pWin._selectHandlerRec, true);
+                }}
+                if (pWin._selectHandlerGB) {{
+                    doc.removeEventListener('focusin', pWin._selectHandlerGB, true);
+                    doc.removeEventListener('click', pWin._selectHandlerGB, true);
+                }}
+                if (pWin._selectionChangeHandlerEntregas) {{
+                    doc.removeEventListener('selectionchange', pWin._selectionChangeHandlerEntregas, true);
                 }}
                 if (pWin._selectionChangeHandlerRec) {{
                     doc.removeEventListener('selectionchange', pWin._selectionChangeHandlerRec, true);
                 }}
                 if (pWin._keyHandlerRec) {{
                     doc.removeEventListener('keydown', pWin._keyHandlerRec, true);
+                }}
+                if (pWin._clearAutoSelectRec) {{
+                    doc.removeEventListener('keydown', pWin._clearAutoSelectRec, true);
+                    doc.removeEventListener('input', pWin._clearAutoSelectRec, true);
+                    doc.removeEventListener('focusout', pWin._clearAutoSelectRec, true);
                 }}
                 if (pWin._keydownClearAutoSelectRec) {{
                     doc.removeEventListener('keydown', pWin._keydownClearAutoSelectRec, true);
@@ -1015,15 +1052,13 @@ def remitos_ventas():
                     doc.removeEventListener('focusout', pWin._focusoutClearAutoSelectRec, true);
                 }}
 
-                // Autoselección de texto al enfocar (excluye selectbox de búsqueda)
+                // Autoselección de texto al enfocar (excluye estrictamente selectboxes de búsqueda)
                 pWin._selectHandlerRec = function(e) {{
                     const target = e.target;
-                    if (!target) return;
+                    if (!target || isSelectboxInput(target)) return;
                     const tag = (target.tagName || '').toUpperCase();
                     if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
                     if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'button' || target.type === 'submit') return;
-                    // No auto-seleccionar inputs dentro de selectboxes (búsqueda de cliente/artículo)
-                    if (target.closest && target.closest('div[data-testid="stSelectbox"]')) return;
 
                     if (target.dataset.autoSelecting === 'true') return;
                     target.dataset.autoSelecting = 'true';
@@ -1032,39 +1067,20 @@ def remitos_ventas():
                         doSelect(target);
                         setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 10);
                         setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 50);
-                        setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 150);
-                        setTimeout(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }}, 300);
-                        requestAnimationFrame(function() {{ if (target.dataset.autoSelecting === 'true') doSelect(target); }});
                     }}
                     runPasses();
                 }};
 
-                pWin._selectionChangeHandlerRec = function() {{
-                    const active = doc.activeElement;
-                    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {{
-                        // No interferir con selectboxes de búsqueda
-                        if (active.closest && active.closest('div[data-testid="stSelectbox"]')) return;
-                        if (active.dataset.autoSelecting === 'true') {{
-                            if (active.selectionStart !== 0 || active.selectionEnd !== active.value.length) {{
-                                doSelect(active);
-                            }}
-                        }}
-                    }}
-                }};
-
                 doc.addEventListener('focusin', pWin._selectHandlerRec, true);
                 doc.addEventListener('click', pWin._selectHandlerRec, true);
-                doc.addEventListener('selectionchange', pWin._selectionChangeHandlerRec, true);
 
-                // Handlers con nombre para limpieza correcta en cada rerun
-                pWin._keydownClearAutoSelectRec = function(e) {{
+                // Limpieza de autoSelecting al presionar tecla, ingresar texto o perder foco
+                pWin._clearAutoSelectRec = function(e) {{
                     if (e.target && e.target.dataset) delete e.target.dataset.autoSelecting;
                 }};
-                pWin._focusoutClearAutoSelectRec = function(e) {{
-                    if (e.target && e.target.dataset) delete e.target.dataset.autoSelecting;
-                }};
-                doc.addEventListener('keydown', pWin._keydownClearAutoSelectRec, true);
-                doc.addEventListener('focusout', pWin._focusoutClearAutoSelectRec, true);
+                doc.addEventListener('keydown', pWin._clearAutoSelectRec, true);
+                doc.addEventListener('input', pWin._clearAutoSelectRec, true);
+                doc.addEventListener('focusout', pWin._clearAutoSelectRec, true);
 
                 // Función para seleccionar la primera opción o la opción activa en BaseWeb Select
                 function triggerOptionClick(targetOpt) {{
@@ -1318,7 +1334,6 @@ def remitos_ventas():
                                     try {{ doc.activeElement.blur(); }} catch(e) {{}}
                                 }}
                                 try {{ input.focus({{ preventScroll: true }}); }} catch(e_f) {{ input.focus(); }}
-                                try {{ input.select(); }} catch(e) {{}}
                             }} else {{
                                 if (attempts > 5) clearInterval(interval);
                             }}

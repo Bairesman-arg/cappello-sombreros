@@ -300,14 +300,44 @@ def gen_barcode():
     <script>
         (function() {{
             const doc = window.parent.document;
+            const pWin = window.parent;
 
-            if (window.parent._selectHandlerGB) {{
-                doc.removeEventListener('focusin', window.parent._selectHandlerGB, true);
-                doc.removeEventListener('click', window.parent._selectHandlerGB, true);
+            // Función para verificar si un elemento es o pertenece a un selectbox/combobox
+            function isSelectboxInput(el) {{
+                if (!el) return false;
+                try {{
+                    if (el.getAttribute && (
+                        el.getAttribute('role') === 'combobox' ||
+                        el.getAttribute('aria-autocomplete') === 'list' ||
+                        el.getAttribute('aria-haspopup') === 'listbox'
+                    )) return true;
+                    if (el.closest && (
+                        el.closest('div[data-testid="stSelectbox"]') ||
+                        el.closest('[data-testid="stSelectbox"]') ||
+                        el.closest('div[data-baseweb="select"]') ||
+                        el.closest('[data-baseweb="select"]') ||
+                        el.closest('.stSelectbox')
+                    )) return true;
+                }} catch(e) {{}}
+                return false;
+            }}
+
+            if (pWin._selectHandlerGB) {{
+                doc.removeEventListener('focusin', pWin._selectHandlerGB, true);
+                doc.removeEventListener('click', pWin._selectHandlerGB, true);
+            }}
+            if (pWin._selectHandlerEntregas) {{
+                doc.removeEventListener('focusin', pWin._selectHandlerEntregas, true);
+                doc.removeEventListener('click', pWin._selectHandlerEntregas, true);
+            }}
+            if (pWin._selectHandlerRec) {{
+                doc.removeEventListener('focusin', pWin._selectHandlerRec, true);
+                doc.removeEventListener('click', pWin._selectHandlerRec, true);
             }}
 
             function doSelect(el) {{
                 if (!el || doc.activeElement !== el) return;
+                if (isSelectboxInput(el)) return;
                 try {{
                     if (typeof el.select === 'function') {{
                         el.select();
@@ -320,9 +350,9 @@ def gen_barcode():
                 }} catch(e2) {{}}
             }}
 
-            window.parent._selectHandlerGB = function(e) {{
+            pWin._selectHandlerGB = function(e) {{
                 const target = e.target;
-                if (!target) return;
+                if (!target || isSelectboxInput(target)) return;
                 const tag = (target.tagName || '').toUpperCase();
                 if (tag !== 'INPUT' && tag !== 'TEXTAREA') return;
 
@@ -330,14 +360,13 @@ def gen_barcode():
                     doSelect(target);
                     setTimeout(function() {{ doSelect(target); }}, 10);
                     setTimeout(function() {{ doSelect(target); }}, 40);
-                    setTimeout(function() {{ doSelect(target); }}, 120);
                 }}
 
                 runPasses();
             }};
 
-            doc.addEventListener('focusin', window.parent._selectHandlerGB, true);
-            doc.addEventListener('click', window.parent._selectHandlerGB, true);
+            doc.addEventListener('focusin', pWin._selectHandlerGB, true);
+            doc.addEventListener('click', pWin._selectHandlerGB, true);
 
             function getFormSequence() {{
                 const sequence = [];
